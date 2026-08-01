@@ -1,6 +1,6 @@
 {
 	"name": "image-resizer",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "On-the-fly image resizing and format conversion over HTTP, built to sit behind a CDN or a caching proxy",
 	"license": "MIT",
 	"author": "Damien Duboeuf <smeagolworms4@gmail.com>",

@@ -294,6 +294,7 @@ comments, and a test checks that the three lists never drift apart.
 | `SHARP_CONCURRENCY` / `SHARP_CACHE_MEMORY` | `0` / `50` | sharp internals: threads (0 = automatic) and cache in MiB |
 | `LOG_FORMAT` | `tiny` | morgan format, or `off` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`, `silent` |
+| `SHUTDOWN_TIMEOUT` | `10000` | Grace given to in-flight transformations after a `SIGTERM`, in ms |
 
 ### HEIC and video
 
@@ -362,7 +363,7 @@ for 30000 px — and `MAX_INPUT_BYTES`, which refuses an oversized original befo
 npm test
 ```
 
-57 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
+58 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
 server is started on the fly. They cover every fitting mode and output format, dimension
 and quality clamping, automatic downscaling, byte-for-byte originals, path traversal,
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream

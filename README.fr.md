@@ -300,6 +300,7 @@ avec des commentaires, et un test vérifie que ces listes ne divergent jamais.
 | `SHARP_CONCURRENCY` / `SHARP_CACHE_MEMORY` | `0` / `50` | Réglages internes de sharp : fils (0 = automatique) et cache en Mio |
 | `LOG_FORMAT` | `tiny` | Format morgan, ou `off` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`, `silent` |
+| `SHUTDOWN_TIMEOUT` | `10000` | Délai laissé aux transformations en cours après un `SIGTERM`, en ms |
 
 ### HEIC et vidéo
 
@@ -369,7 +370,7 @@ le décoder.
 npm test
 ```
 
-57 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
+58 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
 amont est démarré à la volée. Ils couvrent tous les modes d'ajustement et formats de
 sortie, le bornage des dimensions et de la qualité, la réduction automatique, l'original
 octet pour octet, la traversée de chemin, les noms encodés, `BASE_PATH`, les en-têtes de

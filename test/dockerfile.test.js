@@ -71,6 +71,15 @@ test('les valeurs par défaut du Dockerfile sont celles du service', () => {
 	assert.equal(fromImage.cacheDir, '/cache');
 });
 
+test('les variables déclarées sont documentées dans les deux README', async () => {
+	const readmes = await Promise.all([ 'README.md', 'README.fr.md' ].map(async (file) => [ file, await fs.readFile(resolve(ROOT, file), 'utf8') ]));
+
+	for (const [ file, text ] of readmes) {
+		const missing = Object.keys(dockerEnv).filter((name) => name !== 'NODE_ENV' && !text.includes(`\`${name}\``));
+		assert.deepEqual(missing, [], `${file} ne documente pas : ${missing.join(', ')}`);
+	}
+});
+
 test('les variables déclarées existent toutes dans .env.example', async () => {
 	const example = await fs.readFile(resolve(ROOT, '.env.example'), 'utf8');
 	for (const name of Object.keys(dockerEnv)) {
