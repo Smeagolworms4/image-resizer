@@ -20,7 +20,10 @@ PORT="$(node -e 'const s=require("net").createServer();s.listen(0,()=>{console.l
 
 cleanup() {
 	docker rm -f "$NAME" >/dev/null 2>&1 || true
-	rm -rf "$WORK"
+	# Le conteneur écrit son cache sous son propre UID, qui n'est pas forcément
+	# le nôtre (UID 1000 dans l'image, 1001 sur un runner GitHub) : ce ménage
+	# n'est pas toujours possible, et n'a jamais à faire échouer le test.
+	rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -94,3 +97,4 @@ test -d "$WORK/cache" && echo '  ✔ volume de cache accessible en écriture'
 echo "→ arrêt propre"
 docker stop --timeout 30 "$NAME" >/dev/null
 echo "OK : $IMAGE"
+exit 0
