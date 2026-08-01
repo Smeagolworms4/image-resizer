@@ -71,8 +71,10 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     user: "${PUID:-1000}:${PGID:-1000}"
-    env_file:
-      - .env
+    environment:
+      SOURCE_DEMO: /app/public
+      #SOURCE_PHOTOS: /photos
+      #SOURCE_CDN: https://storage.example.com
     ports:
       - "${PORT_HOST:-3000}:3000"
     volumes:
@@ -84,16 +86,16 @@ Then, next to it:
 
 ```bash
 mkdir cache
-cat > .env <<'EOF'
-SOURCE_DEMO=/app/public
-#SOURCE_PHOTOS=/photos
-#SOURCE_CDN=https://storage.example.com
-EOF
 docker compose up -d
 ```
 
-`env_file` is mandatory, so `.env` has to exist — but **at least one source** is, too:
-the service refuses to start without one, rather than starting and 400-ing on everything.
+No configuration file anywhere: every setting is an environment variable, declared wherever
+suits you — `environment:` above, an `env_file:`, `-e` flags, or your orchestrator's own
+mechanism. `.env.example` lists them all, and can be used as an `env_file` if you prefer to
+keep them in one place.
+
+**At least one source is required**, though: the service refuses to start without one,
+rather than starting and 400-ing on everything.
 
 The image ships a few sample images, so the installation can be checked straight away:
 
@@ -202,8 +204,17 @@ route, health check included.
 
 ## Configuration
 
-Everything is set through environment variables, and nothing else. `.env.example` lists
-them all with their defaults.
+Everything is set through environment variables, and nothing else. They are **all declared
+in the image with their default value**, so the settings can be listed without opening the
+documentation:
+
+```bash
+docker run --rm smeagolworms4/image-resizer:latest env
+```
+
+An empty value is not a missing setting: it hands the decision back to the code (no source
+configured, computed header, number of cores). `.env.example` lists the same variables with
+comments, and a test checks that the three lists never drift apart.
 
 ### Sources and network
 
@@ -322,7 +333,7 @@ for 30000 px — and `MAX_INPUT_BYTES`, which refuses an oversized original befo
 npm test
 ```
 
-49 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
+52 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
 server is started on the fly. They cover every fitting mode and output format, dimension
 and quality clamping, automatic downscaling, byte-for-byte originals, path traversal,
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream

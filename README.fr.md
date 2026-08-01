@@ -76,8 +76,10 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
     user: "${PUID:-1000}:${PGID:-1000}"
-    env_file:
-      - .env
+    environment:
+      SOURCE_DEMO: /app/public
+      #SOURCE_PHOTOS: /photos
+      #SOURCE_CDN: https://storage.example.com
     ports:
       - "${PORT_HOST:-3000}:3000"
     volumes:
@@ -89,17 +91,16 @@ Puis, à côté :
 
 ```bash
 mkdir cache
-cat > .env <<'EOF'
-SOURCE_DEMO=/app/public
-#SOURCE_PHOTOS=/photos
-#SOURCE_CDN=https://storage.example.com
-EOF
 docker compose up -d
 ```
 
-`env_file` est obligatoire, donc le fichier `.env` doit exister — mais **au moins une
-source** l'est aussi : le service refuse de démarrer sans, plutôt que de démarrer et de
-répondre 400 à tout.
+Aucun fichier de configuration : chaque réglage est une variable d'environnement, déclarée
+là où ça vous arrange — le `environment:` ci-dessus, un `env_file:`, des `-e`, ou le
+mécanisme de votre orchestrateur. `.env.example` les liste toutes, et peut servir
+d'`env_file` si vous préférez les regrouper dans un fichier.
+
+**Au moins une source reste obligatoire** : le service refuse de démarrer sans, plutôt que
+de démarrer et de répondre 400 à tout.
 
 L'image embarque quelques images d'exemple, de quoi vérifier l'installation immédiatement :
 
@@ -209,8 +210,17 @@ routes, sonde de santé comprise.
 
 ## Configuration
 
-Tout passe par des variables d'environnement, et rien d'autre. `.env.example` les liste
-toutes avec leurs valeurs par défaut.
+Tout passe par des variables d'environnement, et rien d'autre. Elles sont **toutes déclarées
+dans l'image avec leur valeur par défaut**, de sorte qu'on peut lister les réglages sans
+ouvrir la documentation :
+
+```bash
+docker run --rm smeagolworms4/image-resizer:latest env
+```
+
+Une valeur vide n'est pas un réglage absent : elle rend la main au code (source non
+configurée, en-tête calculé, nombre de cœurs). `.env.example` reprend les mêmes variables
+avec des commentaires, et un test vérifie que ces listes ne divergent jamais.
 
 ### Sources et réseau
 
@@ -330,7 +340,7 @@ le décoder.
 npm test
 ```
 
-49 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
+52 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
 amont est démarré à la volée. Ils couvrent tous les modes d'ajustement et formats de
 sortie, le bornage des dimensions et de la qualité, la réduction automatique, l'original
 octet pour octet, la traversée de chemin, les noms encodés, `BASE_PATH`, les en-têtes de

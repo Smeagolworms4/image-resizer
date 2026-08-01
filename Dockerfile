@@ -55,12 +55,57 @@ COPY public ./public
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Tout le reste se règle par variable d'environnement, sans reconstruire :
-# voir .env.example pour la liste complète.
+# Tout est réglable par variable d'environnement, sans reconstruire. La liste
+# est déclarée ici en entier, avec les valeurs par défaut : `docker inspect`
+# suffit alors à savoir ce qui existe et ce que ça vaut, sans lire le code ni
+# la documentation. Les valeurs vides ne sont pas des réglages absents : elles
+# laissent la main au code (source non configurée, en-tête calculé, nombre de
+# cœurs). Un test vérifie que ce bloc ne dérive pas des valeurs par défaut
+# réelles du service.
 ENV NODE_ENV=production \
 	PORT=3000 \
 	HOST=0.0.0.0 \
-	CACHE_DIR=/cache
+	BASE_PATH= \
+	HEALTH_PATH=/health \
+	TRUST_PROXY= \
+	SOURCES= \
+	CACHE_DIR=/cache \
+	CACHE_ORIGINALS=true \
+	MIN_SIZE=1 \
+	MAX_SIZE=2048 \
+	MIN_QUALITY=10 \
+	DEFAULT_QUALITY=80 \
+	DEFAULT_FIT=cover \
+	DEFAULT_FORMAT=jpeg \
+	ALLOWED_FORMATS=jpeg,png,webp,avif \
+	ALLOW_ORIGINAL=true \
+	AUTO_DOWNSCALE=true \
+	STRIP_METADATA=true \
+	MAX_AGE=604800 \
+	S_MAX_AGE=5184000 \
+	STALE_WHILE_REVALIDATE=604800 \
+	ERROR_MAX_AGE=60 \
+	CACHE_CONTROL= \
+	CORS_ORIGIN=* \
+	FETCH_TIMEOUT=15000 \
+	FETCH_USER_AGENT=image-resizer \
+	MAX_INPUT_BYTES=67108864 \
+	MAX_CONCURRENCY= \
+	RETRY_AFTER=2 \
+	SHARP_CONCURRENCY=0 \
+	SHARP_CACHE_MEMORY=50 \
+	HEIC_ENABLED=true \
+	HEIC_COMMAND=heif-convert \
+	HEIC_MAX_CONCURRENCY=2 \
+	HEIC_TIMEOUT=30000 \
+	VIDEO_POSTER_ENABLED=false \
+	VIDEO_POSTER_COMMAND=ffmpeg \
+	VIDEO_POSTER_EXTENSIONS=mp4,mov,webm,m4v,mkv,avi \
+	VIDEO_POSTER_SEEK=1 \
+	VIDEO_POSTER_WIDTH=1280 \
+	VIDEO_POSTER_TIMEOUT=30000 \
+	LOG_FORMAT=tiny \
+	LOG_LEVEL=info
 
 RUN mkdir -p /cache && chown node:node /cache
 VOLUME [ "/cache" ]
