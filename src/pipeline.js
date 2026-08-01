@@ -31,10 +31,6 @@ export async function detectContentType(buffer) {
 	}
 }
 
-export async function readMetadata(buffer) {
-	return sharp(buffer, { failOn: 'none' }).metadata();
-}
-
 export async function transform(buffer, preset, config) {
 	// `failOn: 'none'` : mieux vaut rendre une image tronquée que rien du tout,
 	// et `rotate()` sans argument applique l'orientation EXIF (sinon les photos

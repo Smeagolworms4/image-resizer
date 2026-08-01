@@ -15,7 +15,9 @@ import { derivedCachePath, readFileOrNull, writeFileAtomic } from './storage.js'
 const execFileAsync = promisify(execFile);
 
 export function createConverters(config, logger) {
-	const heicLimiter = createLimiter(config.heicMaxConcurrency);
+	// Une seule limite pour les deux outils externes : ils se disputent le même
+	// processeur, et c'est le total des conversions en vol qui compte.
+	const toolLimiter = createLimiter(config.heicMaxConcurrency);
 
 	async function withTempDir(prefix, task) {
 		const dir = await fs.mkdtemp(join(os.tmpdir(), prefix));
@@ -41,7 +43,7 @@ export function createConverters(config, logger) {
 	// beaucoup de mémoire) : c'est exactement le genre de rafale qui met le
 	// service à terre, d'où une limite de concurrence propre et un cache disque
 	// du résultat quand un CACHE_DIR est configuré.
-	async function heicToPng(context, sourceName, relative, buffer) {
+	async function heicToPng(sourceName, relative, buffer) {
 		if (!config.heicEnabled) throw new HttpError(415, 'HEIC support is disabled');
 
 		const cachePath = derivedCachePath(config, 'converted', sourceName, relative, '.png');
@@ -50,7 +52,7 @@ export function createConverters(config, logger) {
 			if (cached) return cached;
 		}
 
-		const release = heicLimiter.acquire();
+		const release = toolLimiter.acquire();
 		if (!release) {
 			throw unavailable('Too many HEIC conversions in flight', { 'Retry-After': String(config.retryAfter) });
 		}
@@ -90,14 +92,14 @@ export function createConverters(config, logger) {
 		return withoutImage;
 	}
 
-	async function videoPoster(context, sourceName, relative, videoBuffer) {
+	async function videoPoster(sourceName, relative, videoBuffer) {
 		const cachePath = derivedCachePath(config, 'posters', sourceName, relative, '.jpg');
 		if (cachePath) {
 			const cached = await readFileOrNull(cachePath);
 			if (cached) return cached;
 		}
 
-		const release = heicLimiter.acquire();
+		const release = toolLimiter.acquire();
 		if (!release) {
 			throw unavailable('Too many conversions in flight', { 'Retry-After': String(config.retryAfter) });
 		}
@@ -131,5 +133,5 @@ export function createConverters(config, logger) {
 		}
 	}
 
-	return { heicToPng, videoPoster, splitVideoPoster, heicLimiter };
+	return { heicToPng, videoPoster, splitVideoPoster, toolLimiter };
 }

@@ -94,7 +94,7 @@ export function createApp({ config = loadConfig(), logger = createLogger(config?
 			buffer = await tryLoadOriginal(context, sourceName, relative);
 			if (!buffer) {
 				const video = await loadOriginal(context, sourceName, videoPath);
-				buffer = await converters.videoPoster(context, sourceName, relative, video);
+				buffer = await converters.videoPoster(sourceName, relative, video);
 			}
 		} else {
 			buffer = await loadOriginal(context, sourceName, relative);
@@ -112,7 +112,7 @@ export function createApp({ config = loadConfig(), logger = createLogger(config?
 
 		try {
 			if (isHeif(buffer)) {
-				buffer = await converters.heicToPng(context, sourceName, relative, buffer);
+				buffer = await converters.heicToPng(sourceName, relative, buffer);
 			}
 			const output = await transform(buffer, parsed, config);
 			res.set({ 'Content-Type': output.contentType, 'Cache-Control': cacheControl });
@@ -130,9 +130,9 @@ export function createApp({ config = loadConfig(), logger = createLogger(config?
 		res.status(404).json({ error: 'Route not found' });
 	});
 
-	// eslint-disable-next-line no-unused-vars -- Express reconnaît le middleware
-	// d'erreur à ses quatre paramètres.
-	app.use((error, req, res, next) => {
+	// Les quatre paramètres sont ce à quoi Express reconnaît un middleware
+	// d'erreur : `next` ne sert pas ici mais ne peut pas être retiré.
+	app.use((error, req, res, next) => { // eslint-disable-line no-unused-vars
 		const status = error instanceof HttpError ? error.status : 500;
 		if (status >= 500 && !(error instanceof HttpError)) {
 			logger.error(`${req.method} ${req.originalUrl} -> ${error.stack || error.message}`);
