@@ -20,9 +20,6 @@ PORT="$(node -e 'const s=require("net").createServer();s.listen(0,()=>{console.l
 
 cleanup() {
 	docker rm -f "$NAME" >/dev/null 2>&1 || true
-	# Le conteneur écrit son cache sous son propre UID, qui n'est pas forcément
-	# le nôtre (UID 1000 dans l'image, 1001 sur un runner GitHub) : ce ménage
-	# n'est pas toujours possible, et n'a jamais à faire échouer le test.
 	rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -33,8 +30,13 @@ trap cleanup EXIT
 mkdir -p "$WORK/cache"
 chmod 777 "$WORK/cache"
 
-echo "→ démarrage de $IMAGE sur le port $PORT"
+# Le conteneur tourne sous l'UID de l'appelant, exactement comme le `user:` du
+# docker-compose : c'est le cas d'usage réel, et le cache produit nous
+# appartient (l'image tourne en UID 1000, un runner GitHub en 1001 — sans ça,
+# son propre dossier temporaire lui devient indestructible).
+echo "→ démarrage de $IMAGE sur le port $PORT (UID $(id -u):$(id -g))"
 docker run -d --name "$NAME" "${PLATFORM_ARGS[@]}" \
+	--user "$(id -u):$(id -g)" \
 	-p "$PORT:3000" \
 	-e SOURCE_DEMO=/app/public \
 	-e MAX_SIZE=1200 \
@@ -52,7 +54,17 @@ if ! curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null; then
 	exit 1
 fi
 
-echo "→ architecture : $(docker exec "$NAME" uname -m), utilisateur : $(docker exec "$NAME" id -un)"
+echo "→ architecture : $(docker exec "$NAME" uname -m), UID effectif : $(docker exec "$NAME" id -u)"
+
+# L'utilisateur par défaut de l'image se lit dans l'image elle-même : c'est lui
+# qui compte pour qui lance le conteneur sans préciser d'UID.
+IMAGE_USER="$(docker image inspect -f '{{.Config.User}}' "$IMAGE")"
+if [ -z "$IMAGE_USER" ] || [ "$IMAGE_USER" = "root" ] || [ "$IMAGE_USER" = "0" ]; then
+	echo "ÉCHEC : l'image tourne en root par défaut" >&2
+	exit 1
+fi
+echo "  ✔ utilisateur par défaut de l'image : $IMAGE_USER"
+
 if [ "$(docker exec "$NAME" id -u)" = "0" ]; then
 	echo "ÉCHEC : le conteneur tourne en root" >&2
 	exit 1
