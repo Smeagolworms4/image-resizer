@@ -33,11 +33,11 @@ export function makeTempDir(prefix = 'image-resizer-test-') {
 	return fs.mkdtemp(join(os.tmpdir(), prefix));
 }
 
-// Un vrai fichier HEIC (conteneur HEIC, codec HEVC), versionné plutôt que
-// fabriqué à la demande : le libheif de Debian et d'Ubuntu est livré sans
-// encodeur x265, donc `heif-enc` y répond « No HEVC encoder available ». Il
-// sait décoder, pas créer — et c'est le décodage qui nous intéresse.
-export const HEIC_FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'photo.heic');
+// Un vrai fichier HEIC (conteneur HEIC, codec HEVC), versionné avec les autres
+// images plutôt que fabriqué à la demande : le libheif de Debian et d'Ubuntu
+// est livré sans encodeur x265, donc `heif-enc` y répond « No HEVC encoder
+// available ». Il sait décoder, pas créer — et c'est le décodage qui compte.
+export const HEIC_FIXTURE = join(FIXTURES, 'photo.heic');
 
 export async function copyHeic(target) {
 	await fs.mkdir(dirname(target), { recursive: true });

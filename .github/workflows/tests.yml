@@ -27,11 +27,13 @@ jobs:
 
       # heif-convert est ce que le service appelle pour décoder le HEIC ; sans
       # lui, ces tests seraient ignorés en silence — c'est-à-dire jamais
-      # exécutés. ffmpeg couvre les vignettes vidéo.
+      # exécutés. Sur Ubuntu 24.04, le décodeur HEVC lui-même vit dans un
+      # greffon séparé : sans libheif-plugin-libde265, l'outil est bien là mais
+      # ne décode rien. ffmpeg couvre les vignettes vidéo.
       - name: Install libheif and ffmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libheif-examples ffmpeg
+          sudo apt-get install -y --no-install-recommends libheif-examples libheif-plugin-libde265 ffmpeg
 
       - name: Install
         run: npm ci

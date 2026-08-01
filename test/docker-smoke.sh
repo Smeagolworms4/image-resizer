@@ -24,28 +24,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Un vrai fichier HEIC (conteneur HEIC, codec HEVC) : le format des photos
-# iPhone, et le seul que sharp ne sait pas décoder seul. Il est versionné, car
-# le libheif de Debian et d'Ubuntu ne sait pas en produire (pas d'encodeur
-# x265) — il sait seulement en lire, ce qui est justement ce qu'on vérifie.
-mkdir -p "$WORK/media" "$WORK/cache"
-chmod 777 "$WORK/media" "$WORK/cache"
-HEIC=0
-if [ -f "$ROOT/test/fixtures/photo.heic" ]; then
-	cp "$ROOT/test/fixtures/photo.heic" "$WORK/media/photo.heic"
-	chmod 644 "$WORK/media/photo.heic"
-	HEIC=1
-else
-	echo "$ROOT/test/fixtures/photo.heic introuvable : la vérification HEIC est ignorée"
-fi
+# Les images d'exemple embarquées dans l'image contiennent un vrai fichier
+# HEIC (conteneur HEIC, codec HEVC) : le format des photos iPhone, et le seul
+# que sharp ne sait pas décoder seul. Rien à monter, donc.
+mkdir -p "$WORK/cache"
+chmod 777 "$WORK/cache"
 
 echo "→ démarrage de $IMAGE sur le port $PORT"
 docker run -d --name "$NAME" "${PLATFORM_ARGS[@]}" \
 	-p "$PORT:3000" \
 	-e SOURCE_DEMO=/app/public \
-	-e SOURCE_MEDIA=/media \
 	-e MAX_SIZE=1200 \
-	-v "$WORK/media:/media:ro" \
 	-v "$WORK/cache:/cache" \
 	"$IMAGE" >/dev/null
 
@@ -92,14 +81,12 @@ check '/demo/test.png/_cover_120_80_75.webp' webp 120 80
 check '/demo/test.png/_inside_300__.png' png 300 115
 check '/demo/BIG.jpg/_.jpg' jpeg 1200 879
 
-if [ "$HEIC" = "1" ]; then
-	docker exec "$NAME" sh -c 'command -v heif-convert >/dev/null' \
-		|| { echo 'ÉCHEC : heif-convert absent de l’image' >&2; exit 1; }
-	check '/media/photo.heic/_cover_150_150_85.jpg' jpeg 150 150
-	test -f "$WORK/cache/converted/media/photo.heic.png" \
-		|| { echo 'ÉCHEC : la conversion HEIC n’a pas été mise en cache' >&2; exit 1; }
-	echo '  ✔ HEIC/HEVC converti et mis en cache'
-fi
+docker exec "$NAME" sh -c 'command -v heif-convert >/dev/null' \
+	|| { echo 'ÉCHEC : heif-convert absent de l’image' >&2; exit 1; }
+check '/demo/photo.heic/_cover_150_150_85.jpg' jpeg 150 150
+test -f "$WORK/cache/converted/demo/photo.heic.png" \
+	|| { echo 'ÉCHEC : la conversion HEIC n’a pas été mise en cache' >&2; exit 1; }
+echo '  ✔ HEIC/HEVC converti et mis en cache'
 
 # Le cache disque doit être écrit par un conteneur non-root.
 test -d "$WORK/cache" && echo '  ✔ volume de cache accessible en écriture'

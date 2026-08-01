@@ -123,8 +123,10 @@ npm install
 SOURCE_PHOTOS=/path/to/photos CACHE_DIR=./cache npm start
 ```
 
-Node 20.6 or later. `heif-convert` (package `libheif-examples` on Debian/Ubuntu,
-`libheif-tools` on Alpine) is only needed for HEIC photos.
+Node 20.6 or later. `heif-convert` is only needed for HEIC photos: package
+`libheif-examples` on Debian/Ubuntu, `libheif-tools` on Alpine. On Ubuntu 24.04 and later the
+HEVC decoder lives in a separate plugin, `libheif-plugin-libde265` — without it the tool is
+installed but decodes nothing. The Docker image already has everything.
 
 ## Sources
 
@@ -326,10 +328,11 @@ and quality clamping, automatic downscaling, byte-for-byte originals, path trave
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream
 error translation, disk caching (proven by counting upstream requests), and load shedding.
 
-The HEIC tests run against a **real HEVC file** committed under `test/fixtures/`, and check,
-among other things, that sharp still cannot decode it — the day that test fails, the external
-converter can go. The file is committed rather than generated because the libheif shipped by
-Debian and Ubuntu carries no x265 encoder: it reads HEIC, it cannot write it.
+The HEIC tests run against a **real HEVC file** committed with the sample images
+(`public/photo.heic`), and check, among other things, that sharp still cannot decode it — the
+day that test fails, the external converter can go. The file is committed rather than
+generated because the libheif shipped by Debian and Ubuntu carries no x265 encoder: it reads
+HEIC, it cannot write it.
 
 The image itself is tested too:
 

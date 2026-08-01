@@ -1,6 +1,6 @@
 // HEIC/HEVC et vignettes vidéo : les deux chemins qui sortent de sharp pour
-// aller chercher un binaire externe. Le HEIC vient de test/fixtures, la vidéo
-// est fabriquée par ffmpeg au moment du test.
+// aller chercher un binaire externe. Le HEIC est une des images d'exemple du
+// dépôt (public/photo.heic), la vidéo est fabriquée par ffmpeg à la volée.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
@@ -9,7 +9,7 @@ import sharp from 'sharp';
 import { copyHeic, hasCommand, imageInfo, makeTempDir, startApp, writeVideo } from './helpers.js';
 import { isHeif } from '../src/pipeline.js';
 
-// Le fichier HEIC est versionné (test/fixtures) : seul le décodeur est requis.
+// Le fichier HEIC est versionné : seul le décodeur est requis pour ces tests.
 const hasHeifTools = await hasCommand('heif-convert');
 const hasFfmpeg = await hasCommand('ffmpeg', [ '-version' ]);
 

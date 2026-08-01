@@ -30,13 +30,18 @@ export function createConverters(config, logger) {
 
 	function toolFailure(command, error) {
 		if (error.code === 'ENOENT') {
-			logger.error(`'${command}' est introuvable dans le conteneur : fonctionnalité indisponible`);
+			logger.error(`'${command}' est introuvable : fonctionnalité indisponible`);
 			return new HttpError(501, `'${command}' is not installed`);
 		}
 		if (error.killed || error.signal) {
 			return new HttpError(504, `'${command}' timed out`);
 		}
-		return error;
+		// Un outil présent qui échoue quand même a presque toujours dit
+		// pourquoi sur sa sortie d'erreur — sans elle, le 500 est indéchiffrable
+		// (un décodeur HEVC manquant ressemble à un binaire absent).
+		const details = String(error.stderr || error.message).trim().split('\n')[0];
+		logger.error(`'${command}' a échoué : ${details}`);
+		return new HttpError(500, `'${command}' failed: ${details}`);
 	}
 
 	// HEIC -> PNG. La conversion est chère (plusieurs centaines de ms et
