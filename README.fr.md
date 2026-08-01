@@ -259,12 +259,41 @@ avec des commentaires, et un test vérifie que ces listes ne divergent jamais.
 | `CACHE_CONTROL` | — | Remplace l'en-tête calculé à partir des quatre valeurs ci-dessus |
 | `CORS_ORIGIN` | `*` | Vide retire complètement les en-têtes CORS |
 
+### Décodage et redimensionnement
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `AUTO_ROTATE` | `true` | Applique l'orientation EXIF — sans lui, les photos de téléphone sortent couchées |
+| `ALLOW_ENLARGEMENT` | `true` | Autorise l'agrandissement au-delà de la taille de l'original |
+| `DEFAULT_POSITION` | `center` | Zone conservée par `cover`/`contain` : `top`, `left top`… ou `entropy` / `attention`, qui choisissent la zone la plus riche |
+| `RESIZE_KERNEL` | `lanczos3` | `nearest`, `linear`, `cubic`, `mitchell`, `lanczos2`, `lanczos3`, `mks2013`, `mks2021` |
+| `CONTAIN_BACKGROUND` | `#000000` | Couleur des bandes ajoutées par `contain`. `#00000000` pour du transparent |
+| `FAIL_ON` | `none` | Sévérité au décodage : `none`, `truncated`, `error`, `warning` |
+
+### Encodage
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `JPEG_MOZJPEG` | `true` | ~10 % de moins à qualité égale, un peu plus lent. Implique le progressif |
+| `JPEG_PROGRESSIVE` | `false` | JPEG progressif (déjà le cas avec mozjpeg) |
+| `JPEG_CHROMA_SUBSAMPLING` | `4:2:0` | `4:4:4` garde le détail des couleurs, au prix du poids |
+| `PNG_COMPRESSION_LEVEL` | `9` | de 0 à 9 |
+| `PNG_PALETTE` | `false` | Quantifie en palette : bien plus léger, au prix des dégradés |
+| `WEBP_EFFORT` | `4` | de 0 à 6 — plus haut = plus petit et plus lent |
+| `WEBP_LOSSLESS` | `false` | WebP sans perte |
+| `WEBP_SMART_SUBSAMPLE` | `false` | Limite les bavures de couleur sur les bords nets |
+| `AVIF_EFFORT` | `4` | de 0 à 9 — plus haut = plus petit et beaucoup plus lent |
+| `AVIF_LOSSLESS` | `false` | AVIF sans perte |
+| `AVIF_CHROMA_SUBSAMPLING` | `4:4:4` | Même compromis qu'en JPEG |
+
 ### Amont, charge et journaux
 
 | Variable | Défaut | Rôle |
 |---|---|---|
 | `FETCH_TIMEOUT` | `15000` | Délai maximum de la requête amont, en ms |
 | `FETCH_USER_AGENT` | `image-resizer` | `User-Agent` utilisé en amont |
+| `FETCH_HEADERS` | — | Objet JSON d'en-têtes ajoutés en amont — c'est par là que passe l'authentification d'un stockage privé |
+| `FETCH_REDIRECT` | `follow` | `follow`, `error`, `manual` |
 | `MAX_INPUT_BYTES` | `67108864` | Au-delà, l'original est refusé (`413`) |
 | `MAX_CONCURRENCY` | nombre de cœurs | Transformations simultanées avant de répondre `503` |
 | `RETRY_AFTER` | `2` | `Retry-After` envoyé avec un `503`, en secondes |
@@ -340,7 +369,7 @@ le décoder.
 npm test
 ```
 
-52 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
+57 tests, sans accès réseau : les images viennent de `public/`, et un faux serveur HTTP
 amont est démarré à la volée. Ils couvrent tous les modes d'ajustement et formats de
 sortie, le bornage des dimensions et de la qualité, la réduction automatique, l'original
 octet pour octet, la traversée de chemin, les noms encodés, `BASE_PATH`, les en-têtes de

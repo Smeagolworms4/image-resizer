@@ -32,10 +32,11 @@ export async function detectContentType(buffer) {
 }
 
 export async function transform(buffer, preset, config) {
-	// `failOn: 'none'` : mieux vaut rendre une image tronquée que rien du tout,
-	// et `rotate()` sans argument applique l'orientation EXIF (sinon les photos
-	// de téléphone sortent couchées).
-	let image = sharp(buffer, { failOn: 'none' }).rotate();
+	// `FAIL_ON=none` : mieux vaut rendre une image tronquée que rien du tout.
+	// `rotate()` sans argument applique l'orientation EXIF — sans lui, les
+	// photos de téléphone sortent couchées.
+	let image = sharp(buffer, { failOn: config.failOn });
+	if (config.autoRotate) image = image.rotate();
 	const metadata = await image.metadata();
 
 	const hasExplicitResize = Boolean(preset.width || preset.height);
@@ -44,8 +45,10 @@ export async function transform(buffer, preset, config) {
 			width: preset.width || null,
 			height: preset.height || null,
 			fit: preset.fit,
-			position: 'center',
-			withoutEnlargement: false,
+			position: config.defaultPosition,
+			kernel: config.resizeKernel,
+			background: config.containBackground,
+			withoutEnlargement: !config.allowEnlargement,
 		});
 	} else if (config.autoDownscale && (metadata.width > config.maxSize || metadata.height > config.maxSize)) {
 		// Aucune dimension demandée : on borne quand même à MAX_SIZE, sinon un
@@ -54,6 +57,7 @@ export async function transform(buffer, preset, config) {
 			width: config.maxSize,
 			height: config.maxSize,
 			fit: 'inside',
+			kernel: config.resizeKernel,
 			withoutEnlargement: true,
 		});
 	}
@@ -62,16 +66,34 @@ export async function transform(buffer, preset, config) {
 
 	switch (preset.format) {
 		case 'jpeg':
-			image = image.jpeg({ quality: preset.quality, mozjpeg: true });
+			image = image.jpeg({
+				quality: preset.quality,
+				mozjpeg: config.jpegMozjpeg,
+				progressive: config.jpegProgressive,
+				chromaSubsampling: config.jpegChromaSubsampling,
+			});
 			break;
 		case 'png':
-			image = image.png({ compressionLevel: 9 });
+			image = image.png({
+				compressionLevel: config.pngCompressionLevel,
+				palette: config.pngPalette,
+			});
 			break;
 		case 'webp':
-			image = image.webp({ quality: preset.quality });
+			image = image.webp({
+				quality: preset.quality,
+				effort: config.webpEffort,
+				lossless: config.webpLossless,
+				smartSubsample: config.webpSmartSubsample,
+			});
 			break;
 		case 'avif':
-			image = image.avif({ quality: preset.quality });
+			image = image.avif({
+				quality: preset.quality,
+				effort: config.avifEffort,
+				lossless: config.avifLossless,
+				chromaSubsampling: config.avifChromaSubsampling,
+			});
 			break;
 		case 'gif':
 			image = image.gif();

@@ -31,7 +31,7 @@ const server = app.listen(config.port, config.host, () => {
 const shutdown = (signal) => {
 	logger.info(`${signal} reçu, arrêt en cours…`);
 	server.close(() => process.exit(0));
-	setTimeout(() => process.exit(0), 10000).unref();
+	setTimeout(() => process.exit(0), config.shutdownTimeout).unref();
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));

@@ -75,11 +75,12 @@ export async function startApp(env) {
 // Serveur amont minimal : sert un dossier et compte les requêtes reçues, ce
 // qui est la seule façon de prouver que le cache disque évite le second
 // aller-retour.
-export async function startUpstream(root, { status = null } = {}) {
+export async function startUpstream(root, { status = null, onRequest = null } = {}) {
 	const hits = [];
 	const server = http.createServer(async (req, res) => {
 		const relative = decodeURIComponent(req.url.replace(/^\//, '').split('?')[0]);
 		hits.push(relative);
+		if (onRequest) onRequest(req);
 		if (status) return void res.writeHead(status).end('forced');
 		try {
 			const buffer = await fs.readFile(resolve(root, relative));

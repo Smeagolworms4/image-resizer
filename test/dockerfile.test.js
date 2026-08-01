@@ -40,7 +40,7 @@ const dockerEnv = parseEnv(dockerfile);
 // Les noms lus par config.js, relevés dans le code : c'est la liste de
 // référence, et elle ne peut pas se démoder.
 const configSource = await fs.readFile(resolve(ROOT, 'src', 'config.js'), 'utf8');
-const readVariables = new Set([ ...configSource.matchAll(/read(?:String|OptionalString|Bool|Int|List)\(env,\s*'([A-Z0-9_]+)'/g) ].map((match) => match[1]));
+const readVariables = new Set([ ...configSource.matchAll(/read[A-Za-z]*\(env,\s*'([A-Z0-9_]+)'/g) ].map((match) => match[1]));
 
 test('le Dockerfile déclare toutes les variables lues par le service', () => {
 	assert.ok(readVariables.size > 20, `liste de référence suspecte : ${readVariables.size} variables`);

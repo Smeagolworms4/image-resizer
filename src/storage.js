@@ -76,8 +76,8 @@ async function fetchUpstream(config, url, logger) {
 	try {
 		response = await fetch(url, {
 			signal: AbortSignal.timeout(config.fetchTimeout),
-			headers: { 'User-Agent': config.fetchUserAgent, 'Accept': '*/*' },
-			redirect: 'follow',
+			headers: { 'User-Agent': config.fetchUserAgent, 'Accept': '*/*', ...config.fetchHeaders },
+			redirect: config.fetchRedirect,
 		});
 	} catch (error) {
 		if (error.name === 'TimeoutError' || error.name === 'AbortError') {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
+import sharp from 'sharp';
 import { FIXTURES, imageInfo, makeTempDir, rawGet, startApp, startUpstream } from './helpers.js';
 
 const localEnv = (extra = {}) => ({ SOURCE_LOCAL: FIXTURES, LOG_FORMAT: 'off', LOG_LEVEL: 'silent', ...extra });
@@ -313,4 +314,94 @@ test('sous saturation, le service refuse au lieu de s\'effondrer', async (t) => 
 	const refused = responses.find((response) => response.status === 503);
 	assert.equal(refused.headers.get('retry-after'), '3');
 	await Promise.all(responses.map((response) => response.arrayBuffer()));
+});
+
+test('ALLOW_ENLARGEMENT=false n\'agrandit pas au-delà de l\'original', async (t) => {
+	const app = await startApp(localEnv({ ALLOW_ENLARGEMENT: 'false' }));
+	t.after(() => app.close());
+
+	// L'original fait 715x273 : demander 1400 de large ne doit rien inventer.
+	const image = await imageInfo(await app.get('/local/test.png/_inside_1400__.png'));
+	assert.equal(image.width, 715);
+
+	const enlarged = await startApp(localEnv({ ALLOW_ENLARGEMENT: 'true' }));
+	t.after(() => enlarged.close());
+	assert.equal((await imageInfo(await enlarged.get('/local/test.png/_inside_1400__.png'))).width, 1400);
+});
+
+test('CONTAIN_BACKGROUND colore les bandes ajoutées par contain', async (t) => {
+	const app = await startApp(localEnv({ CONTAIN_BACKGROUND: '#ff0000' }));
+	t.after(() => app.close());
+
+	const { buffer } = await imageInfo(await app.get('/local/test.png/_contain_200_200_90.png'));
+	// L'original est plus large que haut : le coin haut-gauche est une bande.
+	const corner = await sharp(buffer).extract({ left: 0, top: 0, width: 4, height: 4 }).raw().toBuffer();
+	assert.equal(corner[0], 255, 'rouge attendu dans la bande');
+	assert.ok(corner[1] < 10 && corner[2] < 10, 'la bande ne doit contenir que du rouge');
+});
+
+test('les options d\'encodage changent le fichier produit', async (t) => {
+	// mozjpeg optimise les passes de balayage, donc produit déjà du progressif :
+	// pour observer JPEG_PROGRESSIVE seul, il faut le désactiver.
+	const base = await startApp(localEnv({ JPEG_MOZJPEG: 'false' }));
+	const progressive = await startApp(localEnv({ JPEG_MOZJPEG: 'false', JPEG_PROGRESSIVE: 'true' }));
+	const mozjpeg = await startApp(localEnv());
+	const lossless = await startApp(localEnv({ WEBP_LOSSLESS: 'true' }));
+	t.after(() => Promise.all([ base.close(), progressive.close(), mozjpeg.close(), lossless.close() ]));
+
+	const path = '/local/test.png/_cover_200_200_80.jpg';
+	const plain = await imageInfo(await base.get(path));
+	const interlaced = await imageInfo(await progressive.get(path));
+	assert.equal(plain.isProgressive, false);
+	assert.equal(interlaced.isProgressive, true);
+
+	// mozjpeg tient sa promesse : plus petit à qualité égale.
+	const optimised = await imageInfo(await mozjpeg.get(path));
+	assert.ok(optimised.buffer.byteLength < plain.buffer.byteLength,
+		`mozjpeg ${optimised.buffer.byteLength} doit être < ${plain.buffer.byteLength}`);
+
+	const compressed = await imageInfo(await mozjpeg.get('/local/test.png/_cover_200_200_80.webp'));
+	const exact = await imageInfo(await lossless.get('/local/test.png/_cover_200_200_80.webp'));
+	assert.ok(exact.buffer.byteLength > compressed.buffer.byteLength, 'le sans-perte doit peser plus lourd');
+});
+
+test('AUTO_ROTATE=false ignore l\'orientation EXIF', async (t) => {
+	const root = await makeTempDir();
+	t.after(() => fs.rm(root, { recursive: true, force: true }));
+
+	// Orientation 6 : l'image est stockée couchée et doit être redressée.
+	const rotated = await sharp(join(FIXTURES, 'test.png'))
+		.jpeg()
+		.withMetadata({ orientation: 6 })
+		.toBuffer();
+	await fs.writeFile(join(root, 'exif.jpg'), rotated);
+
+	const on = await startApp(localEnv({ SOURCE_LOCAL: root }));
+	const off = await startApp(localEnv({ SOURCE_LOCAL: root, AUTO_ROTATE: 'false' }));
+	t.after(() => Promise.all([ on.close(), off.close() ]));
+
+	const redressed = await imageInfo(await on.get('/local/exif.jpg/_.jpg'));
+	const asStored = await imageInfo(await off.get('/local/exif.jpg/_.jpg'));
+	assert.ok(redressed.height > redressed.width, 'redressée : portrait');
+	assert.ok(asStored.width > asStored.height, 'brute : paysage');
+});
+
+test('FETCH_HEADERS sont envoyés à la source HTTP', async (t) => {
+	const received = [];
+	const upstream = await startUpstream(FIXTURES, { onRequest: (req) => received.push(req.headers) });
+	t.after(() => upstream.close());
+
+	const app = await startApp({
+		SOURCE_REMOTE: upstream.base,
+		FETCH_HEADERS: '{"Authorization":"Bearer secret-du-bucket","X-Tenant":"acme"}',
+		FETCH_USER_AGENT: 'mon-resizer/2',
+		LOG_FORMAT: 'off',
+		LOG_LEVEL: 'silent',
+	});
+	t.after(() => app.close());
+
+	assert.equal((await app.get('/remote/test.png/_cover_50_50_80.jpg')).status, 200);
+	assert.equal(received[0].authorization, 'Bearer secret-du-bucket');
+	assert.equal(received[0]['x-tenant'], 'acme');
+	assert.equal(received[0]['user-agent'], 'mon-resizer/2');
 });

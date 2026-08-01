@@ -9,6 +9,21 @@ const FALSE_VALUES = new Set([ '0', 'false', 'no', 'off', 'n' ]);
 
 export const FIT_OPTIONS = [ 'contain', 'cover', 'fill', 'inside', 'outside' ];
 
+// Positions et stratégies de recadrage acceptées par sharp pour `cover` et
+// `contain` : « entropy » et « attention » choisissent la zone à garder.
+export const POSITION_OPTIONS = [
+	'center', 'centre', 'top', 'right top', 'right', 'right bottom',
+	'bottom', 'left bottom', 'left', 'left top', 'entropy', 'attention',
+];
+
+export const KERNEL_OPTIONS = [ 'nearest', 'linear', 'cubic', 'mitchell', 'lanczos2', 'lanczos3', 'mks2013', 'mks2021' ];
+
+export const CHROMA_OPTIONS = [ '4:4:4', '4:2:2', '4:2:0', '4:1:1', '4:0:0' ];
+
+// Ce que sharp accepte comme seuil d'échec de décodage : 'none' rend une image
+// tronquée plutôt qu'une erreur.
+export const FAIL_ON_OPTIONS = [ 'none', 'truncated', 'error', 'warning' ];
+
 // Extension demandée dans l'URL -> format sharp. Plusieurs extensions peuvent
 // pointer vers le même format (jpg/jpeg), c'est le format qui est configurable.
 export const FORMAT_ALIASES = {
@@ -67,6 +82,38 @@ function readInt(env, name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER }
 		throw new ConfigError(`${name}: doit être compris entre ${min} et ${max}, reçu ${parsed}`);
 	}
 	return parsed;
+}
+
+function readEnum(env, name, fallback, allowed) {
+	const value = readString(env, name, fallback);
+	if (!allowed.includes(value)) {
+		throw new ConfigError(`${name}: valeur inconnue '${value}' (attendu : ${allowed.join(', ')})`);
+	}
+	return value;
+}
+
+// Une couleur au sens de sharp : hexadécimal, notation rgb() ou nom CSS.
+function readColour(env, name, fallback) {
+	const value = readString(env, name, fallback);
+	if (!/^#[0-9a-f]{3,8}$/i.test(value) && !/^rgba?\([\d.,\s%]+\)$/i.test(value) && !/^[a-z]+$/i.test(value)) {
+		throw new ConfigError(`${name}: couleur invalide '${value}' (ex. #ffffff, #00000000, rgba(0,0,0,0), white)`);
+	}
+	return value;
+}
+
+function readJsonObject(env, name) {
+	const value = readString(env, name, null);
+	if (value === null) return {};
+	let parsed;
+	try {
+		parsed = JSON.parse(value);
+	} catch {
+		throw new ConfigError(`${name}: JSON invalide`);
+	}
+	if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+		throw new ConfigError(`${name}: un objet JSON {"clé": "valeur"} est attendu`);
+	}
+	return Object.fromEntries(Object.entries(parsed).map(([ key, item ]) => [ key, String(item) ]));
 }
 
 function readList(env, name, fallback) {
@@ -205,9 +252,36 @@ export function loadConfig(env = process.env) {
 
 		corsOrigin: readOptionalString(env, 'CORS_ORIGIN', '*'),
 
+		// Décodage et redimensionnement.
+		failOn: readEnum(env, 'FAIL_ON', 'none', FAIL_ON_OPTIONS),
+		autoRotate: readBool(env, 'AUTO_ROTATE', true),
+		allowEnlargement: readBool(env, 'ALLOW_ENLARGEMENT', true),
+		resizeKernel: readEnum(env, 'RESIZE_KERNEL', 'lanczos3', KERNEL_OPTIONS),
+		defaultPosition: readEnum(env, 'DEFAULT_POSITION', 'center', POSITION_OPTIONS),
+		// Couleur des bandes ajoutées par `contain`.
+		containBackground: readColour(env, 'CONTAIN_BACKGROUND', '#000000'),
+
+		// Encodage, format par format.
+		jpegProgressive: readBool(env, 'JPEG_PROGRESSIVE', false),
+		jpegMozjpeg: readBool(env, 'JPEG_MOZJPEG', true),
+		jpegChromaSubsampling: readEnum(env, 'JPEG_CHROMA_SUBSAMPLING', '4:2:0', CHROMA_OPTIONS),
+		pngCompressionLevel: readInt(env, 'PNG_COMPRESSION_LEVEL', 9, { min: 0, max: 9 }),
+		pngPalette: readBool(env, 'PNG_PALETTE', false),
+		webpEffort: readInt(env, 'WEBP_EFFORT', 4, { min: 0, max: 6 }),
+		webpLossless: readBool(env, 'WEBP_LOSSLESS', false),
+		webpSmartSubsample: readBool(env, 'WEBP_SMART_SUBSAMPLE', false),
+		avifEffort: readInt(env, 'AVIF_EFFORT', 4, { min: 0, max: 9 }),
+		avifLossless: readBool(env, 'AVIF_LOSSLESS', false),
+		avifChromaSubsampling: readEnum(env, 'AVIF_CHROMA_SUBSAMPLING', '4:4:4', CHROMA_OPTIONS),
+
 		fetchTimeout: readInt(env, 'FETCH_TIMEOUT', 15000, { min: 100 }),
 		fetchUserAgent: readString(env, 'FETCH_USER_AGENT', 'image-resizer'),
+		// En-têtes ajoutés aux requêtes amont : c'est par là que passe
+		// l'authentification d'un stockage privé.
+		fetchHeaders: readJsonObject(env, 'FETCH_HEADERS'),
+		fetchRedirect: readEnum(env, 'FETCH_REDIRECT', 'follow', [ 'follow', 'error', 'manual' ]),
 		maxInputBytes: readInt(env, 'MAX_INPUT_BYTES', 64 * 1024 * 1024),
+		shutdownTimeout: readInt(env, 'SHUTDOWN_TIMEOUT', 10000, { min: 0 }),
 
 		// Le nombre de transformations simultanées est la seule protection
 		// réelle : sharp est gourmand, et une rafale de gros originaux suffit à

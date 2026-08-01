@@ -253,12 +253,41 @@ comments, and a test checks that the three lists never drift apart.
 | `CACHE_CONTROL` | — | Replaces the header computed from the four above |
 | `CORS_ORIGIN` | `*` | Empty removes the CORS headers entirely |
 
+### Decoding and resizing
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AUTO_ROTATE` | `true` | Apply EXIF orientation — without it, phone photos come out lying down |
+| `ALLOW_ENLARGEMENT` | `true` | Allow upscaling past the original's size |
+| `DEFAULT_POSITION` | `center` | Area kept by `cover`/`contain`: `top`, `left top`, … or `entropy` / `attention`, which pick the busiest area |
+| `RESIZE_KERNEL` | `lanczos3` | `nearest`, `linear`, `cubic`, `mitchell`, `lanczos2`, `lanczos3`, `mks2013`, `mks2021` |
+| `CONTAIN_BACKGROUND` | `#000000` | Colour of the bars `contain` adds. `#00000000` for transparent |
+| `FAIL_ON` | `none` | Decoding strictness: `none`, `truncated`, `error`, `warning` |
+
+### Encoding
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `JPEG_MOZJPEG` | `true` | ~10 % smaller at the same quality, slightly slower. Implies progressive scans |
+| `JPEG_PROGRESSIVE` | `false` | Progressive JPEG (already the case with mozjpeg) |
+| `JPEG_CHROMA_SUBSAMPLING` | `4:2:0` | `4:4:4` keeps the colour detail, at the cost of size |
+| `PNG_COMPRESSION_LEVEL` | `9` | 0 to 9 |
+| `PNG_PALETTE` | `false` | Quantise to a palette: far lighter, at the cost of gradients |
+| `WEBP_EFFORT` | `4` | 0 to 6 — higher is smaller and slower |
+| `WEBP_LOSSLESS` | `false` | Lossless WebP |
+| `WEBP_SMART_SUBSAMPLE` | `false` | Reduces colour bleeding on sharp edges |
+| `AVIF_EFFORT` | `4` | 0 to 9 — higher is smaller and much slower |
+| `AVIF_LOSSLESS` | `false` | Lossless AVIF |
+| `AVIF_CHROMA_SUBSAMPLING` | `4:4:4` | Same trade-off as JPEG |
+
 ### Upstream, load and logs
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `FETCH_TIMEOUT` | `15000` | Timeout on the upstream request, in ms |
 | `FETCH_USER_AGENT` | `image-resizer` | `User-Agent` used upstream |
+| `FETCH_HEADERS` | — | JSON object of headers added upstream — where a private storage's authentication goes |
+| `FETCH_REDIRECT` | `follow` | `follow`, `error`, `manual` |
 | `MAX_INPUT_BYTES` | `67108864` | Above this, the original is refused (`413`) |
 | `MAX_CONCURRENCY` | number of cores | Simultaneous transformations before answering `503` |
 | `RETRY_AFTER` | `2` | `Retry-After` sent with a `503`, in seconds |
@@ -333,7 +362,7 @@ for 30000 px — and `MAX_INPUT_BYTES`, which refuses an oversized original befo
 npm test
 ```
 
-52 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
+57 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
 server is started on the fly. They cover every fitting mode and output format, dimension
 and quality clamping, automatic downscaling, byte-for-byte originals, path traversal,
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream
