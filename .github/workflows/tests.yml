@@ -25,9 +25,9 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      # heif-enc fabrique les fichiers HEIC de test, heif-convert est ce que le
-      # service appelle réellement. Sans eux, les tests HEIC seraient ignorés en
-      # silence — c'est-à-dire jamais exécutés. ffmpeg couvre les vignettes.
+      # heif-convert est ce que le service appelle pour décoder le HEIC ; sans
+      # lui, ces tests seraient ignorés en silence — c'est-à-dire jamais
+      # exécutés. ffmpeg couvre les vignettes vidéo.
       - name: Install libheif and ffmpeg
         run: |
           sudo apt-get update
@@ -60,13 +60,10 @@ jobs:
         with:
           node-version: '22'
 
-      # heif-enc fabrique le fichier HEIC de test, sharp lit les images
-      # produites pour en vérifier les dimensions.
+      # sharp sert ici à lire les images rendues par le conteneur pour en
+      # vérifier le format et les dimensions.
       - name: Install test tooling
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libheif-examples
-          npm ci --omit=dev
+        run: npm ci --omit=dev
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@master

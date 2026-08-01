@@ -13,6 +13,7 @@ if [ "${2:-}" = "--platform" ] && [ -n "${3:-}" ]; then
 	PLATFORM_ARGS=(--platform "$3")
 fi
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 NAME="image-resizer-smoke-$$"
 PORT="$(node -e 'const s=require("net").createServer();s.listen(0,()=>{console.log(s.address().port);s.close()})')"
@@ -23,18 +24,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Un vrai fichier HEIC (conteneur HEIC, codec HEVC) quand heif-enc est
-# disponible : c'est le format des photos iPhone, et le seul que sharp ne sait
-# pas décoder seul.
+# Un vrai fichier HEIC (conteneur HEIC, codec HEVC) : le format des photos
+# iPhone, et le seul que sharp ne sait pas décoder seul. Il est versionné, car
+# le libheif de Debian et d'Ubuntu ne sait pas en produire (pas d'encodeur
+# x265) — il sait seulement en lire, ce qui est justement ce qu'on vérifie.
 mkdir -p "$WORK/media" "$WORK/cache"
 chmod 777 "$WORK/media" "$WORK/cache"
 HEIC=0
-if command -v heif-enc >/dev/null 2>&1; then
-	heif-enc public/test.png -q 80 -o "$WORK/media/photo.heic" >/dev/null 2>&1
+if [ -f "$ROOT/test/fixtures/photo.heic" ]; then
+	cp "$ROOT/test/fixtures/photo.heic" "$WORK/media/photo.heic"
 	chmod 644 "$WORK/media/photo.heic"
 	HEIC=1
 else
-	echo "heif-enc absent : la vérification HEIC est ignorée"
+	echo "$ROOT/test/fixtures/photo.heic introuvable : la vérification HEIC est ignorée"
 fi
 
 echo "→ démarrage de $IMAGE sur le port $PORT"

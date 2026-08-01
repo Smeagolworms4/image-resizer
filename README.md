@@ -326,8 +326,10 @@ and quality clamping, automatic downscaling, byte-for-byte originals, path trave
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream
 error translation, disk caching (proven by counting upstream requests), and load shedding.
 
-The HEIC tests generate a **real HEVC file** with `heif-enc` and check, among other things,
-that sharp still cannot decode it — the day that test fails, the external converter can go.
+The HEIC tests run against a **real HEVC file** committed under `test/fixtures/`, and check,
+among other things, that sharp still cannot decode it — the day that test fails, the external
+converter can go. The file is committed rather than generated because the libheif shipped by
+Debian and Ubuntu carries no x265 encoder: it reads HEIC, it cannot write it.
 
 The image itself is tested too:
 

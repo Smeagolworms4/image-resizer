@@ -33,11 +33,15 @@ export function makeTempDir(prefix = 'image-resizer-test-') {
 	return fs.mkdtemp(join(os.tmpdir(), prefix));
 }
 
-// Les binaires précompilés de sharp n'encodent pas le HEVC : on passe par
-// heif-enc, qui accompagne heif-convert dans le même paquet.
-export async function writeHeic(target, { source = join(FIXTURES, 'test.png'), quality = 80 } = {}) {
+// Un vrai fichier HEIC (conteneur HEIC, codec HEVC), versionné plutôt que
+// fabriqué à la demande : le libheif de Debian et d'Ubuntu est livré sans
+// encodeur x265, donc `heif-enc` y répond « No HEVC encoder available ». Il
+// sait décoder, pas créer — et c'est le décodage qui nous intéresse.
+export const HEIC_FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'photo.heic');
+
+export async function copyHeic(target) {
 	await fs.mkdir(dirname(target), { recursive: true });
-	await execFileAsync('heif-enc', [ source, '-q', String(quality), '-o', target ], { timeout: 60000 });
+	await fs.copyFile(HEIC_FIXTURE, target);
 	return fs.readFile(target);
 }
 

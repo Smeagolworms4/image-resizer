@@ -1,25 +1,26 @@
 // HEIC/HEVC et vignettes vidéo : les deux chemins qui sortent de sharp pour
-// aller chercher un binaire externe. Les tests fabriquent leurs propres
-// fichiers — un .heic et un .mp4 n'ont rien à faire dans un dépôt git.
+// aller chercher un binaire externe. Le HEIC vient de test/fixtures, la vidéo
+// est fabriquée par ffmpeg au moment du test.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { hasCommand, imageInfo, makeTempDir, startApp, writeHeic, writeVideo } from './helpers.js';
+import { copyHeic, hasCommand, imageInfo, makeTempDir, startApp, writeVideo } from './helpers.js';
 import { isHeif } from '../src/pipeline.js';
 
-const hasHeifTools = await hasCommand('heif-enc') && await hasCommand('heif-convert');
+// Le fichier HEIC est versionné (test/fixtures) : seul le décodeur est requis.
+const hasHeifTools = await hasCommand('heif-convert');
 const hasFfmpeg = await hasCommand('ffmpeg', [ '-version' ]);
 
-if (!hasHeifTools) console.warn('heif-enc/heif-convert absents : tests HEIC ignorés (paquet libheif-examples / libheif-tools)');
+if (!hasHeifTools) console.warn('heif-convert absent : tests de conversion HEIC ignorés (paquet libheif-examples / libheif-tools)');
 if (!hasFfmpeg) console.warn('ffmpeg absent : tests de vignette vidéo ignorés');
 
-test('HEVC : le fichier de test est bien du HEVC, que sharp ne sait pas décoder', { skip: !hasHeifTools }, async (t) => {
+test('HEVC : le fichier de test est bien du HEVC, que sharp ne sait pas décoder', async (t) => {
 	const root = await makeTempDir();
 	t.after(() => fs.rm(root, { recursive: true, force: true }));
 
-	const heic = await writeHeic(join(root, 'photo.heic'));
+	const heic = await copyHeic(join(root, 'photo.heic'));
 
 	// La marque du conteneur : `heic` = HEVC, à ne pas confondre avec `avif`,
 	// que sharp décode nativement et qui ne doit donc pas partir chez le
@@ -43,7 +44,7 @@ test('HEVC : un HEIC est converti puis redimensionné', { skip: !hasHeifTools },
 		await fs.rm(cacheDir, { recursive: true, force: true });
 	});
 
-	await writeHeic(join(root, 'photo.heic'));
+	await copyHeic(join(root, 'photo.heic'));
 	const app = await startApp({ SOURCE_LOCAL: root, CACHE_DIR: cacheDir, LOG_FORMAT: 'off', LOG_LEVEL: 'silent' });
 	t.after(() => app.close());
 
@@ -69,7 +70,7 @@ test('HEVC : la deuxième requête ne relance pas le convertisseur', { skip: !ha
 		await fs.rm(cacheDir, { recursive: true, force: true });
 	});
 
-	await writeHeic(join(root, 'photo.heic'));
+	await copyHeic(join(root, 'photo.heic'));
 	const app = await startApp({
 		SOURCE_LOCAL: root,
 		CACHE_DIR: cacheDir,
@@ -101,7 +102,7 @@ test('HEVC : l\'original HEIC est servi tel quel avec son vrai type', { skip: !h
 	const root = await makeTempDir();
 	t.after(() => fs.rm(root, { recursive: true, force: true }));
 
-	const heic = await writeHeic(join(root, 'photo.heic'));
+	const heic = await copyHeic(join(root, 'photo.heic'));
 	const app = await startApp({ SOURCE_LOCAL: root, LOG_FORMAT: 'off', LOG_LEVEL: 'silent' });
 	t.after(() => app.close());
 
@@ -115,7 +116,7 @@ test('HEVC : HEIC_ENABLED=false répond 415 plutôt que de planter', { skip: !ha
 	const root = await makeTempDir();
 	t.after(() => fs.rm(root, { recursive: true, force: true }));
 
-	await writeHeic(join(root, 'photo.heic'));
+	await copyHeic(join(root, 'photo.heic'));
 	const app = await startApp({ SOURCE_LOCAL: root, HEIC_ENABLED: 'false', LOG_FORMAT: 'off', LOG_LEVEL: 'silent' });
 	t.after(() => app.close());
 
@@ -126,7 +127,7 @@ test('HEVC : un convertisseur absent donne un 501 lisible', { skip: !hasHeifTool
 	const root = await makeTempDir();
 	t.after(() => fs.rm(root, { recursive: true, force: true }));
 
-	await writeHeic(join(root, 'photo.heic'));
+	await copyHeic(join(root, 'photo.heic'));
 	const app = await startApp({ SOURCE_LOCAL: root, HEIC_COMMAND: 'binaire-inexistant', LOG_FORMAT: 'off', LOG_LEVEL: 'silent' });
 	t.after(() => app.close());
 

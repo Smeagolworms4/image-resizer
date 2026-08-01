@@ -335,9 +335,11 @@ octet pour octet, la traversée de chemin, les noms encodés, `BASE_PATH`, les e
 cache et CORS, la revalidation `304`, la traduction des erreurs amont, le cache disque
 (prouvé en comptant les requêtes amont) et le refus sous charge.
 
-Les tests HEIC fabriquent un **vrai fichier HEVC** avec `heif-enc` et vérifient entre autres
-que sharp ne sait toujours pas le décoder — le jour où ce test échouera, le convertisseur
-externe pourra disparaître.
+Les tests HEIC travaillent sur un **vrai fichier HEVC** versionné dans `test/fixtures/`, et
+vérifient entre autres que sharp ne sait toujours pas le décoder — le jour où ce test
+échouera, le convertisseur externe pourra disparaître. Le fichier est versionné plutôt que
+fabriqué parce que le libheif livré par Debian et Ubuntu n'embarque pas d'encodeur x265 :
+il lit le HEIC, il ne sait pas l'écrire.
 
 L'image elle-même est testée :
 
