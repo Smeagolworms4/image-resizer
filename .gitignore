@@ -1,0 +1,7 @@
+node_modules/
+cache/
+.claude/
+.env
+*.log
+.idea/
+.DS_Store

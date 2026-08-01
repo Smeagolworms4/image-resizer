@@ -1,0 +1,13 @@
+node_modules
+cache
+samples
+test
+.git
+.github
+.claude
+.idea
+.env
+.env.*
+*.log
+README*.md
+docker-compose.yml

@@ -1,0 +1,90 @@
+name: 'tests'
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      # L'image tourne sur Node 22 ; on vérifie la LTS précédente et la suivante
+      # pour voir venir les ruptures avant qu'elles n'arrivent en production.
+      matrix:
+        node: [ '20', '22', '24' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # heif-enc fabrique les fichiers HEIC de test, heif-convert est ce que le
+      # service appelle réellement. Sans eux, les tests HEIC seraient ignorés en
+      # silence — c'est-à-dire jamais exécutés. ffmpeg couvre les vignettes.
+      - name: Install libheif and ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libheif-examples ffmpeg
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+  # Les tests Node valident le service ; celui-ci valide l'image : démarrage,
+  # exécution en non-root, présence de heif-convert, volume de cache
+  # accessible en écriture — et tout cela sur les trois architectures
+  # publiées, les deux ARM étant exécutées sous QEMU.
+  docker:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64, linux/arm/v7 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # heif-enc fabrique le fichier HEIC de test, sharp lit les images
+      # produites pour en vérifier les dimensions.
+      - name: Install test tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libheif-examples
+          npm ci --omit=dev
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@master
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for ${{ matrix.platform }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          load: true
+          tags: image-resizer:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test
+        run: ./test/docker-smoke.sh image-resizer:ci --platform ${{ matrix.platform }}

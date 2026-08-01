@@ -1,0 +1,21 @@
+services:
+  image-resizer:
+    image: smeagolworms4/image-resizer:latest
+    # Décommentez pour reconstruire localement, par exemple pour ajouter ffmpeg
+    # (vignettes vidéo) :
+    # build:
+    #   context: .
+    #   args:
+    #     INSTALL_FFMPEG: "true"
+    container_name: image-resizer
+    restart: unless-stopped
+    # Laisse les transformations en cours se terminer plutôt que de couper net.
+    stop_grace_period: 30s
+    # Écrit dans ./cache avec votre UID plutôt qu'en root.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    env_file:
+      - .env
+    ports:
+      - "${PORT_HOST:-3000}:3000"
+    volumes:
+      - ./cache:/cache

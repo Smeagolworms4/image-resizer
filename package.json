@@ -1,0 +1,22 @@
+{
+	"name": "image-resizer",
+	"version": "1.0.0",
+	"description": "On-the-fly image resizing and format conversion over HTTP, built to sit behind a CDN or a caching proxy",
+	"license": "MIT",
+	"author": "Damien Duboeuf <smeagolworms4@gmail.com>",
+	"type": "module",
+	"main": "src/index.js",
+	"engines": {
+		"node": ">=20.6"
+	},
+	"scripts": {
+		"start": "node src/index.js",
+		"dev": "node --env-file=.env --watch src/index.js",
+		"test": "node --test test/*.test.js"
+	},
+	"dependencies": {
+		"express": "^5.2.1",
+		"morgan": "^1.11.0",
+		"sharp": "^0.35.3"
+	}
+}
