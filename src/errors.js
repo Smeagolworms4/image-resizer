@@ -12,5 +12,6 @@ export class HttpError extends Error {
 }
 
 export const badRequest = (message) => new HttpError(400, message);
+export const forbidden = (message) => new HttpError(403, message);
 export const notFound = (message = 'Image not found') => new HttpError(404, message);
 export const unavailable = (message, headers) => new HttpError(503, message, { headers });

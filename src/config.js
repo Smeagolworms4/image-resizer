@@ -3,6 +3,7 @@
 // les tests peuvent fabriquer une configuration sans toucher à l'environnement.
 import { resolve } from 'node:path';
 import os from 'node:os';
+import { DIGEST_LENGTHS, SIGNATURE_ALGORITHMS } from './signature.js';
 
 const TRUE_VALUES = new Set([ '1', 'true', 'yes', 'on', 'y' ]);
 const FALSE_VALUES = new Set([ '0', 'false', 'no', 'off', 'n' ]);
@@ -217,6 +218,14 @@ export function loadConfig(env = process.env) {
 		throw new ConfigError(`DEFAULT_FIT: mode inconnu '${defaultFit}' (connus : ${FIT_OPTIONS.join(', ')})`);
 	}
 
+	// Signature des URL : la clé vide (le défaut) désactive tout le mécanisme.
+	const signatureKey = readString(env, 'SIGNATURE_KEY', '');
+	const signatureAlgorithm = readEnum(env, 'SIGNATURE_ALGORITHM', 'sha256', SIGNATURE_ALGORITHMS);
+	const signatureLength = readInt(env, 'SIGNATURE_LENGTH', 16, { min: 8, max: 128 });
+	if (signatureLength > DIGEST_LENGTHS[signatureAlgorithm]) {
+		throw new ConfigError(`SIGNATURE_LENGTH: ${signatureAlgorithm} produit ${DIGEST_LENGTHS[signatureAlgorithm]} caractères, ${signatureLength} demandés`);
+	}
+
 	const config = {
 		port: readInt(env, 'PORT', 3000, { min: 0, max: 65535 }),
 		host: readString(env, 'HOST', '0.0.0.0'),
@@ -251,6 +260,12 @@ export function loadConfig(env = process.env) {
 		errorMaxAge: readInt(env, 'ERROR_MAX_AGE', 60),
 
 		corsOrigin: readOptionalString(env, 'CORS_ORIGIN', '*'),
+
+		// Vide : les URL sont acceptées telles quelles, comme avant. Renseignée :
+		// toute URL doit porter sa signature, sous peine de 403.
+		signatureKey,
+		signatureAlgorithm,
+		signatureLength,
 
 		// Décodage et redimensionnement.
 		failOn: readEnum(env, 'FAIL_ON', 'none', FAIL_ON_OPTIONS),
@@ -327,6 +342,8 @@ export function describeConfig(config) {
 		allowedFormats: config.allowedFormats.join(','),
 		allowOriginal: config.allowOriginal,
 		autoDownscale: config.autoDownscale,
+		// La clé elle-même n'a rien à faire dans les journaux.
+		signature: config.signatureKey ? `${config.signatureAlgorithm}, ${config.signatureLength} caractères` : false,
 		maxConcurrency: config.maxConcurrency,
 		heicEnabled: config.heicEnabled,
 		videoPosterEnabled: config.videoPosterEnabled,

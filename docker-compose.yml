@@ -21,6 +21,9 @@ services:
       #SOURCE_CDN: https://storage.example.com
       #MAX_SIZE: "2048"
       #DEFAULT_QUALITY: "80"
+      # Signature des URL : vide (défaut) = tout est servi comme avant. Voir
+      # SIGNATURE.fr.md pour produire la signature côté application.
+      #SIGNATURE_KEY: "une-longue-chaîne-secrète"
     # Si vous préférez tenir ces réglages dans un fichier, décommentez ceci —
     # le fichier devra alors exister.
     #env_file:

@@ -10,4 +10,5 @@ test
 .env.*
 *.log
 README*.md
+SIGNATURE*.md
 docker-compose.yml

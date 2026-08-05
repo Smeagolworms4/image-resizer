@@ -25,6 +25,8 @@ turns it into a fast service: it only ever computes a given variant once.
 - **Applies EXIF orientation** and strips metadata (including GPS) from what it serves.
 - **Protects itself**: dimensions are clamped, oversized originals refused, and beyond a
   configurable number of simultaneous transformations it answers `503` instead of falling over.
+- **Signs its URLs, if you want it to**: with a key set, an address is only served if it
+  carries the right HMAC — nobody gets to order the variants of their choosing.
 - **Everything is configured through environment variables** — no config file, nothing to rebuild.
 - Runs on **amd64, arm64 and armv7**: a NAS, a VPS or a Raspberry Pi all work.
 
@@ -51,6 +53,14 @@ _<fit>_<width>_<height>_<quality>.<format>
 Empty fields fall back to the defaults, which is why `_original___.jpg` carries three
 underscores. Unknown fitting modes and disallowed formats are rejected with a `400` rather
 than silently served as something else — a cache would keep that mistake for weeks.
+
+A preset can also carry a **signature**, which is optional and off by default — see
+[Signed URLs](https://github.com/Smeagolworms4/image-resizer/blob/main/README.md#signed-urls)
+below:
+
+```
+/photos/beach.jpg/_cover_320_320_80_3dc222d73386b95c.webp
+```
 
 **Why a path segment and not a query string**: caches key on the URL, and many of them are
 configured to drop or reorder query strings, which silently multiplies or merges entries.
@@ -253,6 +263,14 @@ comments, and a test checks that the three lists never drift apart.
 | `CACHE_CONTROL` | — | Replaces the header computed from the four above |
 | `CORS_ORIGIN` | `*` | Empty removes the CORS headers entirely |
 
+### Signed URLs
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SIGNATURE_KEY` | empty | The HMAC secret. **Empty disables signing**, and every URL is served as before |
+| `SIGNATURE_ALGORITHM` | `sha256` | `sha256`, `sha1` or `sha512` |
+| `SIGNATURE_LENGTH` | `16` | Hex characters kept, 8 to 128 — within the digest's own length |
+
 ### Decoding and resizing
 
 | Variable | Default | Purpose |
@@ -311,6 +329,38 @@ comments, and a test checks that the three lists never drift apart.
 | `VIDEO_POSTER_WIDTH` | `1280` | Width of the extracted frame |
 | `VIDEO_POSTER_TIMEOUT` | `30000` | Timeout, in ms |
 
+## Signed URLs
+
+Off by default, and worth turning on the day the service faces the open internet. The
+dimensions live in the URL, so anyone reading the HTML can ask for `_cover_1999_1999_100.avif`
+and every variation of it — each one a cache miss and a full decode-resize-encode for an image
+no page will ever show.
+
+Set a key, and an address is only served if it carries the matching HMAC:
+
+```yaml
+environment:
+  SIGNATURE_KEY: "a-long-random-secret"   # openssl rand -hex 32
+```
+
+```
+/photos/holiday/beach.jpg/_cover_320_320_80.webp                      403
+/photos/holiday/beach.jpg/_cover_320_320_80_3dc222d73386b95c.webp     200
+```
+
+The signature is one more field at the end of the preset, before the extension. Producing it
+takes three lines: join `<source>/<path>/<preset>`, take
+`HMAC-SHA256(key, that)` in hex, keep the first 16 characters, and insert them before the
+extension. The rejection happens before any file is read, so an unsigned request costs one
+HMAC and nothing else.
+
+**→ [How to generate a signature, in JS, PHP, Python, .NET and Java](https://github.com/Smeagolworms4/image-resizer/blob/main/SIGNATURE.md)** —
+reference values to check an implementation against, and the details that trip people up
+(encoding, `BASE_PATH`, key rotation).
+
+An empty `SIGNATURE_KEY` — the default — disables the whole mechanism: nothing is verified,
+and URLs work exactly as they always did.
+
 ## iPhone photos (HEIC / HEVC)
 
 sharp's prebuilt binaries read the HEIC header but **cannot decode HEVC** — it ships no
@@ -363,11 +413,15 @@ for 30000 px — and `MAX_INPUT_BYTES`, which refuses an oversized original befo
 npm test
 ```
 
-58 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
+68 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
 server is started on the fly. They cover every fitting mode and output format, dimension
 and quality clamping, automatic downscaling, byte-for-byte originals, path traversal,
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream
 error translation, disk caching (proven by counting upstream requests), and load shedding.
+
+URL signing gets its own file: that an empty key changes nothing, that a signature only
+opens the variant it was computed for — a stolen one does not buy a 2000×2000 — and that
+neither `BASE_PATH` nor percent-encoding takes part in the computation.
 
 The HEIC tests run against a **real HEVC file** committed with the sample images
 (`public/photo.heic`), and check, among other things, that sharp still cannot decode it — the
@@ -395,6 +449,7 @@ src/
   config.js       environment → configuration, and the checks done at startup
   server.js       routing, CORS, cache headers, error handling
   preset.js       parsing of the _fit_w_h_q.ext segment
+  signature.js    optional HMAC signing of URLs
   pipeline.js     sharp: decoding, rotation, resizing, encoding
   storage.js      sources, path safety, upstream download, disk cache
   converters.js   HEIC/HEVC and video poster frames, through external binaries
@@ -449,6 +504,13 @@ folder: `/photos/2024/beach.jpg/_.webp` reads `<source>/2024/beach.jpg`.
 **`501 'heif-convert' is not installed`** — the HEIC converter is missing from the image,
 which happens on a custom build made with `--build-arg INSTALL_HEIF=false`.
 
+**`403 Signature manquante` / `Signature invalide`** — `SIGNATURE_KEY` is set, so every URL
+needs its signature. Check that the application signs `<source>/<path>/<preset>` **decoded**,
+with no leading slash and no `BASE_PATH`, and that both sides agree on `SIGNATURE_LENGTH` and
+`SIGNATURE_ALGORITHM`. The
+[signing guide](https://github.com/Smeagolworms4/image-resizer/blob/main/SIGNATURE.md) has
+reference values to compare against.
+
 **`503` under load** — that is the intended behaviour, not a bug. Raise `MAX_CONCURRENCY`
 if the machine can take it, and above all put a cache in front so those requests never
 reach it twice.
@@ -464,6 +526,11 @@ source root, so a `../` is rejected rather than resolved.
 
 Output metadata is stripped by default (`STRIP_METADATA=true`), including **GPS
 coordinates** — worth keeping in mind before setting it to `false` on holiday photos.
+
+`SIGNATURE_KEY` binds each URL to the variant it asks for: without the key, an address cannot
+be fabricated, and the service stops being a free image farm for anyone who can read your
+HTML. It is not access control — a signed URL stays valid for whoever holds it, which is what
+lets a cache keep it for months.
 
 The service has no notion of authentication, and does not try to: it serves what its
 sources contain. Anything private belongs behind the cache or the reverse proxy that

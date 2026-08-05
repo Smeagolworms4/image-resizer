@@ -2,11 +2,12 @@ import express from 'express';
 import morgan from 'morgan';
 import { describeConfig, loadConfig } from './config.js';
 import { createLogger } from './logger.js';
-import { HttpError, badRequest, notFound, unavailable } from './errors.js';
+import { HttpError, badRequest, forbidden, notFound, unavailable } from './errors.js';
 import { createLimiter } from './semaphore.js';
 import { createConverters } from './converters.js';
 import { loadOriginal, normalizeRelative, tryLoadOriginal } from './storage.js';
 import { isPreset, parsePreset } from './preset.js';
+import { canonicalPath, splitSignature, verifySignature } from './signature.js';
 import { applySharpTuning, detectContentType, isHeif, transform } from './pipeline.js';
 
 const decodeSegment = (segment) => {
@@ -78,8 +79,25 @@ export function createApp({ config = loadConfig(), logger = createLogger(config?
 		if (segments.length < 2) throw notFound('Route not found');
 
 		const [ sourceName ] = segments;
-		const preset = segments[segments.length - 1];
+		let preset = segments[segments.length - 1];
+		let signature = null;
+
+		// La signature est un champ du preset : on la retire avant tout le reste,
+		// pour que la suite travaille sur le preset habituel.
+		if (config.signatureKey) {
+			const split = splitSignature(preset);
+			if (!split) throw forbidden('Signature manquante');
+			preset = split.preset;
+			signature = split.signature;
+		}
+
 		const relative = normalizeRelative(segments.slice(1, -1).join('/'));
+
+		// Vérifiée avant de regarder la source ou de toucher au disque : une URL
+		// non signée ne doit rien coûter d'autre qu'un HMAC.
+		if (config.signatureKey && !verifySignature(config, canonicalPath(sourceName, relative, preset), signature)) {
+			throw forbidden('Signature invalide');
+		}
 
 		if (!config.sources[sourceName]) throw badRequest(`Source '${sourceName}' inconnue`);
 		if (!isPreset(preset)) throw notFound('Route not found');
