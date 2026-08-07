@@ -150,7 +150,7 @@ and `npm run build:lambda` rebuilds it.
 ```bash
 aws lambda create-function --function-name image-resizer \
   --runtime nodejs22.x --architectures x86_64 --handler src/lambda.handler \
-  --zip-file fileb://dist/image-resizer-lambda-1.2.0-x64.zip \
+  --zip-file fileb://dist/image-resizer-lambda-1.3.0-x64.zip \
   --memory-size 2048 --timeout 30 --role "$ROLE_ARN" \
   --environment 'Variables={SOURCE_DEMO=/var/task/public,CACHE_DIR=/tmp/cache,HEIC_ENABLED=false}'
 ```

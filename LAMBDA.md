@@ -62,7 +62,7 @@ aws lambda create-function \
   --architectures x86_64 \
   --handler src/lambda.handler \
   --role "arn:aws:iam::$ACCOUNT:role/image-resizer-lambda" \
-  --zip-file fileb://dist/image-resizer-lambda-1.2.0-x64.zip \
+  --zip-file fileb://dist/image-resizer-lambda-1.3.0-x64.zip \
   --memory-size 2048 \
   --timeout 30 \
   --environment 'Variables={SOURCE_DEMO=/var/task/public,CACHE_DIR=/tmp/cache,HEIC_ENABLED=false}'

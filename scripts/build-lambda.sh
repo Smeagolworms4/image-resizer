@@ -109,8 +109,13 @@ build() {
 	rm -f "$stage/package-lock.json"
 
 	rm -f "$zipfile"
-	# Liste triée et horodatage fixe : deux constructions du même commit
-	# rendent la même archive, ce qui rend une somme de contrôle vérifiable.
+	# Liste triée, droits et horodatage fixes : deux constructions du même
+	# commit rendent la même archive, sur n'importe quelle machine, ce qui rend
+	# la somme de contrôle publiée vérifiable. Les droits comptent autant que le
+	# reste — zip les enregistre, et le umask d'un poste de développement n'est
+	# pas celui d'un runner. Rien n'a besoin d'être exécutable ici : même les
+	# binaires de sharp sont chargés par dlopen, donc lus, jamais lancés.
+	chmod -R a=rX,u+w "$stage"
 	find "$stage" -exec touch -h -t 200001010000 {} +
 	( cd "$stage" && find . \( -type f -o -type l \) | LC_ALL=C sort | zip -q -X -@ "$zipfile" )
 	rm -rf "$stage"
