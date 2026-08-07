@@ -15,3 +15,5 @@ docker-compose.yml
 dist
 scripts
 LAMBDA*.md
+HEIC*.md
+PUBLISHING*.md

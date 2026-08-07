@@ -55,8 +55,7 @@ underscores. Unknown fitting modes and disallowed formats are rejected with a `4
 than silently served as something else — a cache would keep that mistake for weeks.
 
 A preset can also carry a **signature**, which is optional and off by default — see
-[Signed URLs](https://github.com/Smeagolworms4/image-resizer/blob/main/README.md#signed-urls)
-below:
+[SIGNATURE.md](https://github.com/Smeagolworms4/image-resizer/blob/main/SIGNATURE.md):
 
 ```
 /photos/beach.jpg/_cover_320_320_80_3dc222d73386b95c.webp
@@ -135,10 +134,9 @@ npm install
 SOURCE_PHOTOS=/path/to/photos CACHE_DIR=./cache npm start
 ```
 
-Node 20.6 or later. `heif-convert` is only needed for HEIC photos: package
-`libheif-examples` on Debian/Ubuntu, `libheif-tools` on Alpine. On Ubuntu 24.04 and later the
-HEVC decoder lives in a separate plugin, `libheif-plugin-libde265` — without it the tool is
-installed but decodes nothing. The Docker image already has everything.
+Node 20.6 or later. `heif-convert` is only needed for HEIC photos, and the Docker image
+already has it — [HEIC.md](https://github.com/Smeagolworms4/image-resizer/blob/main/HEIC.md)
+lists the package to install elsewhere.
 
 ### On AWS Lambda
 
@@ -337,49 +335,24 @@ comments, and a test checks that the three lists never drift apart.
 
 ## Signed URLs
 
-Off by default, and worth turning on the day the service faces the open internet. The
+Off by default, and worth turning on the day the service faces the open internet: the
 dimensions live in the URL, so anyone reading the HTML can ask for `_cover_1999_1999_100.avif`
-and every variation of it — each one a cache miss and a full decode-resize-encode for an image
-no page will ever show.
+and every variation of it — each one a cache miss and a full decode-resize-encode for an
+image no page will ever show. Set a key, and an address is only served if it carries the
+matching HMAC, rejected before any file is read.
 
-Set a key, and an address is only served if it carries the matching HMAC:
-
-```yaml
-environment:
-  SIGNATURE_KEY: "a-long-random-secret"   # openssl rand -hex 32
-```
-
-```
-/photos/holiday/beach.jpg/_cover_320_320_80.webp                      403
-/photos/holiday/beach.jpg/_cover_320_320_80_3dc222d73386b95c.webp     200
-```
-
-The signature is one more field at the end of the preset, before the extension. Producing it
-takes three lines: join `<source>/<path>/<preset>`, take
-`HMAC-SHA256(key, that)` in hex, keep the first 16 characters, and insert them before the
-extension. The rejection happens before any file is read, so an unsigned request costs one
-HMAC and nothing else.
-
-**→ [How to generate a signature, in JS, PHP, Python, .NET and Java](https://github.com/Smeagolworms4/image-resizer/blob/main/SIGNATURE.md)** —
-reference values to check an implementation against, and the details that trip people up
-(encoding, `BASE_PATH`, key rotation).
-
-An empty `SIGNATURE_KEY` — the default — disables the whole mechanism: nothing is verified,
-and URLs work exactly as they always did.
+**→ [How signing works, and how to produce a signature in JS, PHP, Python, .NET and Java](https://github.com/Smeagolworms4/image-resizer/blob/main/SIGNATURE.md)**
+— with reference values to check an implementation against, and the details that trip people
+up (encoding, `BASE_PATH`, key rotation).
 
 ## iPhone photos (HEIC / HEVC)
 
-sharp's prebuilt binaries read the HEIC header but **cannot decode HEVC** — it ships no
-decoder for it. So the service detects the container by its signature (twelve bytes: an
-`ftyp` box and its brand) and hands those files to `heif-convert`, which the image already
-contains. AVIF shares that container but sharp decodes it natively, so it never takes that
-detour.
+sharp's prebuilt binaries read the HEIC header but **cannot decode HEVC**, so the service
+sniffs the container itself and hands those files to `heif-convert`, which the image already
+contains. The conversion is expensive, capped at `HEIC_MAX_CONCURRENCY` runs and cached on
+disk — a burst on the same photo triggers one conversion, not fifty.
 
-The conversion is expensive, in CPU and in memory: it is capped at
-`HEIC_MAX_CONCURRENCY` simultaneous runs, and **its result is cached on disk** in
-`CACHE_DIR/converted/`. A burst of requests on the same photo therefore triggers one
-conversion, not fifty — a stampede of parallel conversions is precisely what takes a
-resizer down.
+**→ [Why an external binary, installing the decoder, settings and troubleshooting](https://github.com/Smeagolworms4/image-resizer/blob/main/HEIC.md)**
 
 ## Video poster frames
 
@@ -470,7 +443,7 @@ src/
 `config.js` is the only module that reads `process.env`: one place to look to know what is
 adjustable, and tests can build a configuration without touching the environment.
 
-## Docker Hub image and automatic publication
+## Docker Hub image
 
 **https://hub.docker.com/r/smeagolworms4/image-resizer**
 
@@ -481,26 +454,10 @@ manifest — the same tag works on a PC, a NAS and a Raspberry Pi.
 |---|---|
 | `latest` | every push to `main`, and every git tag — the one to use |
 | `main` | every push to the `main` branch |
-| `<version>` (e.g. `1.0.0`) | creation of a git tag of that name, to pin a version |
+| `<version>` (e.g. `1.3.0`) | creation of a git tag of that name, to pin a version |
 
-The image is Debian-based rather than Alpine: sharp publishes no musl binary for 32-bit
-ARM, and an image that does not run on a Raspberry Pi would miss the point. Dependencies
-are installed for the target architecture from the build machine's own architecture
-(`npm ci --os --libc --cpu`), so nothing has to run under QEMU during the build.
-
-### GitHub secrets to create by hand
-
-Two workflows handle publication: `build_images.yml` (multi-arch build and push) and
-`push_readme.yml` (syncs the Docker Hub description from this README). Both need **two
-repository secrets**, added in *Settings → Secrets and variables → Actions*:
-
-A third, `build_lambda.yml`, builds the Lambda archives and attaches them to the release on
-a tag. No secret needed.
-
-| Secret | Content |
-|---|---|
-| `DOCKER_USERNAME` | your Docker Hub username (also used to build the image name) |
-| `DOCKER_PASSWORD` | a Docker Hub *access token* |
+**→ [How the image and the Lambda archives are built and published](https://github.com/Smeagolworms4/image-resizer/blob/main/PUBLISHING.md)**
+— the workflows, the GitHub secrets a fork needs, and how a version is cut.
 
 ## Troubleshooting
 
@@ -514,8 +471,8 @@ without a source. Set at least one `SOURCE_<NAME>`.
 (`docker exec image-resizer ls /photos`), and remember that a local source is rooted at its
 folder: `/photos/2024/beach.jpg/_.webp` reads `<source>/2024/beach.jpg`.
 
-**`501 'heif-convert' is not installed`** — the HEIC converter is missing from the image,
-which happens on a custom build made with `--build-arg INSTALL_HEIF=false`.
+**`501 'heif-convert' is not installed`** — the HEIC converter is not on `PATH`; see
+[HEIC.md](https://github.com/Smeagolworms4/image-resizer/blob/main/HEIC.md).
 
 **`403 Signature manquante` / `Signature invalide`** — `SIGNATURE_KEY` is set, so every URL
 needs its signature. Check that the application signs `<source>/<path>/<preset>` **decoded**,
