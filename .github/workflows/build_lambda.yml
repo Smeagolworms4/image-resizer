@@ -1,0 +1,103 @@
+# Construction séparée de celle des images Docker : le paquet Lambda n'a rien à
+# voir avec un conteneur, il ne dépend ni de buildx ni de QEMU, et une panne de
+# l'un ne doit pas empêcher l'autre de sortir.
+
+name: 'build lambda'
+
+on:
+  create:
+    tags:
+  push:
+    branches: [ main ]
+  pull_request:
+  # Pour refabriquer une archive sans repousser de tag.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        arch: [ x64, arm64 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # La version de Node du runner ne détermine pas celle de la Lambda : elle
+      # ne sert qu'à faire tourner npm. Les binaires, eux, sont demandés pour
+      # linux/glibc et l'architecture visée, comme dans le Dockerfile.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Build
+        run: ./scripts/build-lambda.sh --arch ${{ matrix.arch }}
+
+      - name: Checksum
+        id: package
+        run: |
+          FILE=$(ls dist/image-resizer-lambda-*-${{ matrix.arch }}.zip)
+          sha256sum "$FILE" | tee "$FILE.sha256"
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      # Le paquet d'une architecture qu'on ne peut pas exécuter ici ne peut pas
+      # être testé ici : seul x64 passe par un vrai démarrage. Le zip arm64 est
+      # vérifié par sa composition (le script échoue si le binaire manque).
+      - name: Smoke test
+        if: matrix.arch == 'x64'
+        run: |
+          mkdir -p /tmp/lambda && unzip -q "${{ steps.package.outputs.file }}" -d /tmp/lambda
+          cd /tmp/lambda
+          cat > invoke.mjs <<'EOF'
+          process.env.SOURCE_DEMO = new URL('./public', import.meta.url).pathname;
+          process.env.LOG_LEVEL = 'silent';
+          process.env.LOG_FORMAT = 'off';
+          const { handler } = await import('./src/lambda.js');
+          const event = (rawPath) => ({
+            version: '2.0', rawPath, rawQueryString: '', headers: {},
+            requestContext: { http: { method: 'GET', path: rawPath } },
+          });
+
+          const health = await handler(event('/health'));
+          if (health.statusCode !== 200) throw new Error(`santé : ${health.statusCode}`);
+
+          const image = await handler(event('/demo/test.png/_cover_320_200_80.webp'));
+          if (image.statusCode !== 200) throw new Error(`image : ${image.statusCode} ${image.body}`);
+          if (!image.isBase64Encoded) throw new Error('une image doit sortir en base64');
+
+          const sharp = (await import('sharp')).default;
+          const { format, width, height } = await sharp(Buffer.from(image.body, 'base64')).metadata();
+          if (format !== 'webp' || width !== 320 || height !== 200) {
+            throw new Error(`image inattendue : ${format} ${width}x${height}`);
+          }
+          console.log('paquet Lambda fonctionnel :', format, `${width}x${height}`);
+          EOF
+          node invoke.mjs
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-resizer-lambda-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 90
+
+      # Sur un tag, l'archive est attachée à la publication GitHub : c'est là
+      # qu'on va la chercher pour la déposer sur une Lambda, sans avoir à
+      # reconstruire quoi que ce soit.
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*.sha256

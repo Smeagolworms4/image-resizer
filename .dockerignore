@@ -12,3 +12,6 @@ test
 README*.md
 SIGNATURE*.md
 docker-compose.yml
+dist
+scripts
+LAMBDA*.md

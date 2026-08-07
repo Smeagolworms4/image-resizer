@@ -12,7 +12,8 @@
 	"scripts": {
 		"start": "node src/index.js",
 		"dev": "node --env-file=.env --watch src/index.js",
-		"test": "node --test test/*.test.js"
+		"test": "node --test test/*.test.js",
+		"build:lambda": "./scripts/build-lambda.sh --all"
 	},
 	"dependencies": {
 		"express": "^5.2.1",

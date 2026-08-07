@@ -140,6 +140,26 @@ Node 20.6 or later. `heif-convert` is only needed for HEIC photos: package
 HEVC decoder lives in a separate plugin, `libheif-plugin-libde265` — without it the tool is
 installed but decodes nothing. The Docker image already has everything.
 
+### On AWS Lambda
+
+The same service also ships as a zip ready to drop onto a Lambda function — no container,
+no machine to keep alive. A ready-made archive is attached to every
+[release](https://github.com/Smeagolworms4/image-resizer/releases), one per architecture,
+and `npm run build:lambda` rebuilds it.
+
+```bash
+aws lambda create-function --function-name image-resizer \
+  --runtime nodejs22.x --architectures x86_64 --handler src/lambda.handler \
+  --zip-file fileb://dist/image-resizer-lambda-1.2.0-x64.zip \
+  --memory-size 2048 --timeout 30 --role "$ROLE_ARN" \
+  --environment 'Variables={SOURCE_DEMO=/var/task/public,CACHE_DIR=/tmp/cache,HEIC_ENABLED=false}'
+```
+
+Everything below applies unchanged — same variables, same URL format, same signing. What
+differs is what serverless makes different: a cache is no longer advisable but required,
+`/tmp` is the only writable disk, and HEIC and video need a layer. **[LAMBDA.md](LAMBDA.md)**
+covers the whole thing.
+
 ## Sources
 
 A source is a **name**, which becomes the first segment of the URL, and a **target**:
@@ -413,7 +433,7 @@ for 30000 px — and `MAX_INPUT_BYTES`, which refuses an oversized original befo
 npm test
 ```
 
-68 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
+77 tests, no network access needed: fixtures come from `public/`, and a fake upstream HTTP
 server is started on the fly. They cover every fitting mode and output format, dimension
 and quality clamping, automatic downscaling, byte-for-byte originals, path traversal,
 percent-encoded names, `BASE_PATH`, cache and CORS headers, `304` revalidation, upstream
@@ -428,6 +448,12 @@ The HEIC tests run against a **real HEVC file** committed with the sample images
 day that test fails, the external converter can go. The file is committed rather than
 generated because the libheif shipped by Debian and Ubuntu carries no x265 encoder: it reads
 HEIC, it cannot write it.
+
+The Lambda entry point has its own file: that an image comes back in base64 while JSON stays
+text, that the `2.0` and REST/ALB event shapes lead to the same place, that a conditional
+request still yields a `304` — it does not, if the relay uses `fetch`, which strips the
+headers the check depends on — and that a response too large for Lambda is refused with a
+message saying what to do about it.
 
 The image itself is tested too:
 
@@ -446,6 +472,7 @@ the two ARM ones under QEMU.
 ```
 src/
   index.js        entry point: configuration, listening socket, clean shutdown
+  lambda.js       AWS Lambda entry point: event → HTTP request, response → JSON
   config.js       environment → configuration, and the checks done at startup
   server.js       routing, CORS, cache headers, error handling
   preset.js       parsing of the _fit_w_h_q.ext segment
@@ -483,6 +510,10 @@ are installed for the target architecture from the build machine's own architect
 Two workflows handle publication: `build_images.yml` (multi-arch build and push) and
 `push_readme.yml` (syncs the Docker Hub description from this README). Both need **two
 repository secrets**, added in *Settings → Secrets and variables → Actions*:
+
+A third one, `build_lambda.yml`, is independent of them: it builds the `x64` and `arm64`
+Lambda archives, invokes the handler on a sample image to prove the package works, publishes
+them as artifacts and, on a tag, attaches them to the GitHub release. It needs no secret.
 
 | Secret | Content |
 |---|---|
