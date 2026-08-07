@@ -14,6 +14,10 @@ turns it into a fast service: it only ever computes a given variant once.
 [![Image Size](https://img.shields.io/docker/image-size/smeagolworms4/image-resizer/latest)](https://hub.docker.com/r/smeagolworms4/image-resizer)
 ![arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20armv7-6ee7a8)
 
+*Why it exists and how it is used in production:
+[Image Resizer : la taille sur demande](https://smea.tech/image-resizer-taille-sur-demande/)
+— article in French.*
+
 ## What it does
 
 - **Resizes, crops and converts** to JPEG, PNG, WebP or AVIF, with the five sharp fitting

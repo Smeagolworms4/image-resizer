@@ -15,6 +15,9 @@ variante donnée n'est calculée qu'une seule fois.
 [![Image Size](https://img.shields.io/docker/image-size/smeagolworms4/image-resizer/latest)](https://hub.docker.com/r/smeagolworms4/image-resizer)
 ![arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20armv7-6ee7a8)
 
+*Pourquoi il existe et comment il tourne en production :
+[Image Resizer : la taille sur demande](https://smea.tech/image-resizer-taille-sur-demande/).*
+
 ## Ce qu'il fait
 
 - **Redimensionne, recadre et convertit** en JPEG, PNG, WebP ou AVIF, avec les cinq modes
