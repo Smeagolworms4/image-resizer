@@ -15,8 +15,7 @@ turns it into a fast service: it only ever computes a given variant once.
 ![arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64%20%7C%20armv7-6ee7a8)
 
 *Why it exists and how it is used in production:
-[Image Resizer : la taille sur demande](https://smea.tech/image-resizer-taille-sur-demande/)
-— article in French.*
+[Image Resizer : la taille sur demande](https://smea.tech/image-resizer-taille-sur-demande/).*
 
 ## What it does
 
