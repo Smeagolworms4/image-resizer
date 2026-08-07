@@ -80,6 +80,20 @@ test('les variables déclarées sont documentées dans les deux README', async (
 	}
 });
 
+// La description longue d'un dépôt Dockerhub est plafonnée à 25000 caractères,
+// et l'API refuse tout ce qui dépasse sans rien casser côté client : le
+// workflow se déclarait vert en laissant la description précédente en ligne.
+// Le README anglais est ce qui y est publié — mieux vaut l'apprendre ici qu'en
+// s'apercevant, des semaines plus tard, que la page n'a pas bougé.
+test('le README anglais tient dans la description Dockerhub', async () => {
+	const readme = await fs.readFile(resolve(ROOT, 'README.md'), 'utf8');
+	// `length` compte comme le fait l'API : en points de code, pas en octets.
+	assert.ok(
+		readme.length <= 25000,
+		`README.md fait ${readme.length} caractères, Dockerhub en accepte 25000 : raccourcir, ou déplacer une section dans un fichier dédié`,
+	);
+});
+
 test('les variables déclarées existent toutes dans .env.example', async () => {
 	const example = await fs.readFile(resolve(ROOT, '.env.example'), 'utf8');
 	for (const name of Object.keys(dockerEnv)) {

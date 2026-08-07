@@ -142,23 +142,9 @@ installed but decodes nothing. The Docker image already has everything.
 
 ### On AWS Lambda
 
-The same service also ships as a zip ready to drop onto a Lambda function — no container,
-no machine to keep alive. A ready-made archive is attached to every
-[release](https://github.com/Smeagolworms4/image-resizer/releases), one per architecture,
-and `npm run build:lambda` rebuilds it.
-
-```bash
-aws lambda create-function --function-name image-resizer \
-  --runtime nodejs22.x --architectures x86_64 --handler src/lambda.handler \
-  --zip-file fileb://dist/image-resizer-lambda-1.3.0-x64.zip \
-  --memory-size 2048 --timeout 30 --role "$ROLE_ARN" \
-  --environment 'Variables={SOURCE_DEMO=/var/task/public,CACHE_DIR=/tmp/cache,HEIC_ENABLED=false}'
-```
-
-Everything below applies unchanged — same variables, same URL format, same signing. What
-differs is what serverless makes different: a cache is no longer advisable but required,
-`/tmp` is the only writable disk, and HEIC and video need a layer. **[LAMBDA.md](LAMBDA.md)**
-covers the whole thing.
+The same service also ships as a zip ready to drop onto a Lambda function, one archive per
+architecture on every [release](https://github.com/Smeagolworms4/image-resizer/releases).
+Same variables, same URL format, same signing. **[LAMBDA.md](LAMBDA.md)** covers it.
 
 ## Sources
 
@@ -449,11 +435,8 @@ day that test fails, the external converter can go. The file is committed rather
 generated because the libheif shipped by Debian and Ubuntu carries no x265 encoder: it reads
 HEIC, it cannot write it.
 
-The Lambda entry point has its own file: that an image comes back in base64 while JSON stays
-text, that the `2.0` and REST/ALB event shapes lead to the same place, that a conditional
-request still yields a `304` — it does not, if the relay uses `fetch`, which strips the
-headers the check depends on — and that a response too large for Lambda is refused with a
-message saying what to do about it.
+The Lambda entry point has its own file: event shapes, base64, and the `304` that a relay
+through `fetch` silently loses.
 
 The image itself is tested too:
 
@@ -511,9 +494,8 @@ Two workflows handle publication: `build_images.yml` (multi-arch build and push)
 `push_readme.yml` (syncs the Docker Hub description from this README). Both need **two
 repository secrets**, added in *Settings → Secrets and variables → Actions*:
 
-A third one, `build_lambda.yml`, is independent of them: it builds the `x64` and `arm64`
-Lambda archives, invokes the handler on a sample image to prove the package works, publishes
-them as artifacts and, on a tag, attaches them to the GitHub release. It needs no secret.
+A third, `build_lambda.yml`, builds the Lambda archives and attaches them to the release on
+a tag. No secret needed.
 
 | Secret | Content |
 |---|---|

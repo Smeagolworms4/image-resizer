@@ -147,23 +147,10 @@ bien installé mais ne décode rien. L'image Docker, elle, a déjà tout.
 
 ### Sur AWS Lambda
 
-Le même service existe aussi en zip prêt à déposer sur une fonction Lambda — pas de
-conteneur, pas de machine à maintenir en vie. Une archive toute faite est attachée à chaque
-[publication](https://github.com/Smeagolworms4/image-resizer/releases), une par
-architecture, et `npm run build:lambda` la reconstruit.
-
-```bash
-aws lambda create-function --function-name image-resizer \
-  --runtime nodejs22.x --architectures x86_64 --handler src/lambda.handler \
-  --zip-file fileb://dist/image-resizer-lambda-1.3.0-x64.zip \
-  --memory-size 2048 --timeout 30 --role "$ROLE_ARN" \
-  --environment 'Variables={SOURCE_DEMO=/var/task/public,CACHE_DIR=/tmp/cache,HEIC_ENABLED=false}'
-```
-
-Tout ce qui suit s'applique sans changement — mêmes variables, même format d'URL, même
-signature. Ce qui diffère, c'est ce que le sans-serveur change : le cache n'est plus
-conseillé mais obligatoire, `/tmp` est le seul disque accessible en écriture, et le HEIC et
-la vidéo demandent une couche. **[LAMBDA.fr.md](LAMBDA.fr.md)** couvre l'ensemble.
+Le même service existe aussi en zip prêt à déposer sur une fonction Lambda, une archive par
+architecture à chaque [publication](https://github.com/Smeagolworms4/image-resizer/releases).
+Mêmes variables, même format d'URL, même signature.
+**[LAMBDA.fr.md](LAMBDA.fr.md)** couvre l'ensemble.
 
 ## Les sources
 
@@ -457,11 +444,8 @@ le jour où ce test échouera, le convertisseur externe pourra disparaître. Le 
 versionné plutôt que fabriqué parce que le libheif livré par Debian et Ubuntu n'embarque pas
 d'encodeur x265 : il lit le HEIC, il ne sait pas l'écrire.
 
-Le point d'entrée Lambda a le sien : qu'une image revienne en base64 quand le JSON reste du
-texte, que les charges `2.0` et REST/ALB mènent au même endroit, qu'une requête
-conditionnelle rende toujours un `304` — ce qui n'est pas le cas si le relais passe par
-`fetch`, qui retire les en-têtes dont dépend ce contrôle — et qu'une réponse trop grosse
-pour Lambda soit refusée avec un message qui dit quoi faire.
+Le point d'entrée Lambda a le sien : les formes d'événement, le base64, et le `304` qu'un
+relais par `fetch` perd en silence.
 
 L'image elle-même est testée :
 
@@ -522,10 +506,8 @@ poussée) et `push_readme.yml` (synchronise la description Docker Hub depuis le 
 anglais). Les deux ont besoin de **deux secrets de dépôt**, à ajouter dans *Settings →
 Secrets and variables → Actions* :
 
-Un troisième, `build_lambda.yml`, est indépendant : il construit les archives Lambda `x64`
-et `arm64`, invoque le point d'entrée sur une image d'exemple pour prouver que le paquet
-fonctionne, les publie en artefacts et, sur un tag, les attache à la publication GitHub. Il
-n'a besoin d'aucun secret.
+Un troisième, `build_lambda.yml`, construit les archives Lambda et les attache à la
+publication sur un tag. Aucun secret.
 
 | Secret | Contenu |
 |---|---|

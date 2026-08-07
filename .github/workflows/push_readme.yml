@@ -12,11 +12,53 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Push readme
+      # Dockerhub plafonne la description longue à 25000 caractères et rejette
+      # tout ce qui dépasse — sans que rien n'échoue côté client. Le contrôle
+      # est fait ici, avant l'envoi, parce qu'une description silencieusement
+      # restée à la version précédente est exactement le genre de panne qu'on
+      # ne remarque pas.
+      - name: Check readme length
+        # Sans locale UTF-8, `wc -m` compte des octets et non des caractères :
+        # le README en compte 125 de plus en octets, de quoi fausser le verdict.
+        env:
+          LC_ALL: C.UTF-8
         run: |
+          LENGTH=$(wc -m < README.md)
+          echo "README.md : $LENGTH caractères (limite Dockerhub : 25000)"
+          if [ "$LENGTH" -gt 25000 ]; then
+            echo "::error file=README.md::README.md fait $LENGTH caractères, Dockerhub en accepte 25000. Il faut le raccourcir, ou déplacer une section dans un fichier dédié."
+            exit 1
+          fi
+
+      - name: Push readme
+        env:
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
           DOCKERHUB_REPO_NAME=$(echo ${GITHUB_REPOSITORY#*/} | tr '[:upper:]' '[:lower:]')
-          TOKEN=$(curl -s -X POST -H "Content-Type: application/json" -d '{"username": "${{ secrets.DOCKER_USERNAME }}", "password": "${{ secrets.DOCKER_PASSWORD }}"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
+          TOKEN=$(curl -sf -X POST -H "Content-Type: application/json" -d '{"username": "${{ secrets.DOCKER_USERNAME }}", "password": "${{ secrets.DOCKER_PASSWORD }}"}' https://hub.docker.com/v2/users/login/ | jq -r .token)
           DESC=$(cat ./README.md | jq -sR .)
-          # Dockerhub limite la description à 100 octets : on tronque sur un mot entier si besoin
+          # Dockerhub limite la description courte à 100 octets : on tronque sur un mot entier si besoin
           GH_DESCRIPTION=$(curl -s "https://api.github.com/repos/${GITHUB_REPOSITORY}" | jq '.description // "" | if utf8bytelength <= 100 then . else (until(utf8bytelength <= 97; .[0:-1]) | sub("\\s*\\S*$"; "") + "…") end')
-          curl -s -X PATCH -H "Authorization: JWT $TOKEN" -H "Content-Type: application/json" -d "{\"full_description\": $DESC, \"description\": $GH_DESCRIPTION}" https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/$DOCKERHUB_REPO_NAME/
+
+          # `-w %{http_code}` plutôt qu'un `curl -s` muet : l'API répond 400 avec
+          # le détail de ce qu'elle refuse, et sans le lire le workflow se
+          # déclarait vert en n'ayant rien publié.
+          RESPONSE=$(curl -s -w '\n%{http_code}' -X PATCH \
+            -H "Authorization: JWT $TOKEN" -H "Content-Type: application/json" \
+            -d "{\"full_description\": $DESC, \"description\": $GH_DESCRIPTION}" \
+            "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/$DOCKERHUB_REPO_NAME/")
+          STATUS=$(echo "$RESPONSE" | tail -1)
+          if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+            echo "::error::Dockerhub a refusé la description (HTTP $STATUS) : $(echo "$RESPONSE" | head -n -1)"
+            exit 1
+          fi
+
+          # Et on relit ce qui est réellement en ligne : un 200 sur une écriture
+          # partielle resterait invisible autrement.
+          PUBLISHED=$(curl -sf "https://hub.docker.com/v2/repositories/${{ secrets.DOCKER_USERNAME }}/$DOCKERHUB_REPO_NAME/" | jq -r '.full_description | length')
+          echo "Description publiée : $PUBLISHED caractères, attendus $(wc -m < README.md)"
+          if [ "$PUBLISHED" -ne "$(wc -m < README.md)" ]; then
+            echo "::error::La description en ligne ne correspond pas à README.md."
+            exit 1
+          fi
