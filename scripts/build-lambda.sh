@@ -106,7 +106,11 @@ build() {
 	find "$stage/node_modules" -type d \
 		\( -name test -o -name tests -o -name __tests__ -o -name example -o -name examples -o -name docs -o -name .github \) \
 		-prune -exec rm -rf {} +
-	rm -f "$stage/package-lock.json"
+	# Le lockfile caché de npm ne sert qu'à ses propres installations suivantes,
+	# et son format suit la version de npm : le garder rendait l'archive
+	# différente selon la machine qui construit, pour un fichier que Lambda
+	# n'ouvrira jamais.
+	rm -f "$stage/package-lock.json" "$stage/node_modules/.package-lock.json"
 
 	rm -f "$zipfile"
 	# Liste triée, droits et horodatage fixes : deux constructions du même
